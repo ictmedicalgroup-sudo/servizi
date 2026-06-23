@@ -389,7 +389,7 @@ function doLogout(){
 async function loadAll(){
   const[profili,sedi,sr,raccolte]=await Promise.all([
     db('GET',T('profili'),{ord:'cognome.asc,nome.asc'}),
-    db('GET',T('sedi'),{ord:'nome.asc'}),
+    db('GET','sedi_sedi',{ord:'nome.asc'}), // tabella del tool "Gestione Sedi", non servizi_
     db('GET',T('sede_referenti')),
     db('GET',T('raccolte'),{ord:'created_at.desc',lim:'200'}),
   ]);
@@ -460,7 +460,7 @@ function renderHome(){
 // SEDI (scelta sede → avvia flow)
 // ══════════════════════════════════════════
 function renderSedi(){
-  const sedi=S.sedi.filter(s=>s.attivo!==false);
+  const sedi=S.sedi.filter(s=>s.attiva!==false);
   $('v-sedi').innerHTML=`
     <div class="ph"><button class="back" onclick="goView('home')">‹</button><div><h1>Scegli la sede</h1><div class="sub">Sede che stai visitando</div></div></div>
     <div class="search-wrap"><input id="sede-search" placeholder="Cerca sede..." oninput="filterSedi(this.value)"></div>
@@ -471,13 +471,13 @@ function sedeCardHTML(s){
   const nref=referentiDiSede(s.id).length;
   return `<div class="card"><div class="card-tap" onclick="startFlow('${s.id}')">
     <div class="card-icon">${esc((s.nome||'?')[0].toUpperCase())}</div>
-    <div class="card-body"><div class="card-title">${esc(s.nome)}</div><div class="card-meta">${s.citta?esc(s.citta)+' · ':''}${nref} referente${nref===1?'':'i'}</div></div>
+    <div class="card-body"><div class="card-title">${esc(s.nome)}</div><div class="card-meta">${s.indirizzo?esc(s.indirizzo)+' · ':''}${nref} referente${nref===1?'':'i'}</div></div>
     <div class="card-arrow">›</div>
   </div></div>`;
 }
 function filterSedi(q){
   q=(q||'').toLowerCase();
-  const sedi=S.sedi.filter(s=>s.attivo!==false&&(`${s.nome} ${s.citta||''}`.toLowerCase().includes(q)));
+  const sedi=S.sedi.filter(s=>s.attiva!==false&&(`${s.nome} ${s.indirizzo||''}`.toLowerCase().includes(q)));
   $('sedi-list').innerHTML=sedi.map(sedeCardHTML).join('')||emptyHTML('🔍','Nessun risultato','');
 }
 
@@ -534,7 +534,7 @@ function renderStepImporto(){
   const f=S.flow;const sede=sedeById(f.sedeId);
   const refs=referentiDiSede(f.sedeId);
   $('v-flow').innerHTML=`
-    <div class="ph"><button class="back" onclick="abortFlow()">‹</button><div><h1>${esc(sede?.nome||'Sede')}</h1><div class="sub">${sede?.citta?esc(sede.citta)+' · ':''}Nuova raccolta</div></div></div>
+    <div class="ph"><button class="back" onclick="abortFlow()">‹</button><div><h1>${esc(sede?.nome||'Sede')}</h1><div class="sub">${sede?.indirizzo?esc(sede.indirizzo)+' · ':''}Nuova raccolta</div></div></div>
     ${stepsHTML('importo')}
 
     <div class="importo-box" id="imp-box">
