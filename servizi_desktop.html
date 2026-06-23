@@ -537,6 +537,45 @@ function openReferentiModal(sedeId){
 }
 
 // ══════════════════════════════════════════
+// CHECK EMAIL LIVE (pattern standard Medical Group)
+// ══════════════════════════════════════════
+async function checkEmailLive(inputEl,infoEl,pwdWrap,fnName){
+  const email=inputEl.value.trim();
+  if(infoEl){infoEl.style.display='none';infoEl.dataset.exists='';}
+  if(!email||!email.includes('@')||!email.includes('.'))return;
+  if(!infoEl)return;
+  infoEl.style.cssText='display:block;margin-top:6px;padding:6px 10px;border-radius:var(--rsm);background:var(--g50);border:1px solid var(--g200);font-size:12px;color:var(--g500)';
+  infoEl.textContent='Verifica in corso…';
+  try{
+    const res=await fetch(`${CFG.FN}/${fnName}`,{method:'POST',
+      headers:{'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
+      body:JSON.stringify({action:'check_email',email})});
+    const data=await res.json();
+    if(!data.ok){
+      infoEl.style.cssText='display:block;margin-top:6px;padding:6px 10px;border-radius:var(--rsm);background:var(--red-light);border:1px solid var(--red);font-size:12px;color:var(--red)';
+      infoEl.textContent='Errore verifica: '+(data.error||'risposta non valida');
+      return;
+    }
+    infoEl.dataset.exists=data.exists?'true':'false';
+    if(data.exists){
+      infoEl.style.cssText='display:block;margin-top:6px;padding:8px 12px;border-radius:var(--rsm);background:#EEF5E3;border:1px solid var(--verde);font-size:12px;color:#2e6e1a;font-weight:600';
+      infoEl.textContent='✓ Utente già presente — la password rimane la stessa impostata per gli altri tool';
+      const wrap=pwdWrap||document.getElementById('um-pwd-wrap');
+      if(wrap){wrap.style.display='none';const p=wrap.querySelector('input[type=password]');if(p){p.value='';p.disabled=true;}}
+    }else{
+      infoEl.style.cssText='display:block;margin-top:6px;padding:8px 12px;border-radius:var(--rsm);background:var(--g50);border:1px solid var(--g200);font-size:12px;color:var(--g500)';
+      infoEl.textContent='Nuovo utente — inserisci una password per creare l\'account';
+      const wrap=pwdWrap||document.getElementById('um-pwd-wrap');
+      if(wrap){wrap.style.display='';const p=wrap.querySelector('input[type=password]');if(p)p.disabled=false;}
+    }
+  }catch(e){
+    infoEl.style.cssText='display:block;margin-top:6px;padding:6px 10px;border-radius:var(--rsm);background:var(--red-light);border:1px solid var(--red);font-size:12px;color:var(--red)';
+    infoEl.textContent='Errore di rete: '+e.message;
+  }
+}
+const PWD_WARN_HTML='<div style="margin-top:6px;padding:8px 12px;border-radius:var(--rsm);background:#FEF0E3;border:1px solid #f5c28a;font-size:12px;color:#7a3800;font-weight:600">⚠ Attenzione: questa password sarà valida per tutti i tool che usano lo stesso account.</div>';
+
+// ══════════════════════════════════════════
 // UTENTI — gestione servizi_profili
 // ══════════════════════════════════════════
 const RBADGE={admin:['bg-adm','Admin'],incaricato:['bg-inc','Incaricato'],referente:['bg-ref','Referente']};
@@ -563,7 +602,7 @@ function openUtenteModal(uid_val){
     </div>
     <div class="fg"><div class="fl">E-Mail *</div>
       <input class="fi" id="um-email" type="email" value="${esc(u?.email||'')}" ${isNew?'placeholder="nome@medicalgroup.it"':'readonly style="background:var(--g50);color:var(--g500);cursor:not-allowed"'}>
-      ${isNew?'<div id="um-email-info" style="font-size:12px;margin-top:4px"></div>':''}
+      ${isNew?'<div id="um-email-info" style="display:none"></div>':''}
     </div>
     ${isNew?`<div id="um-pwd-wrap"><div class="fg"><div class="fl">Password *</div><input class="fi" id="um-pwd" type="password" placeholder="Minimo 6 caratteri"></div></div>`:''}
     <div class="fg"><div class="fl">Ruolo</div>
@@ -577,7 +616,9 @@ function openUtenteModal(uid_val){
       <div class="tg"><input type="checkbox" id="um-attivo" ${u?.attivo!==false?'checked':''}><span class="tsl"></span></div>
       <span class="fl" style="margin:0">Utente attivo</span>
     </label></div>
-    ${!isNew?`<div class="fg"><div class="fl">Nuova password <span style="font-weight:400;font-size:11px;color:var(--g500)">(lascia vuoto per non modificare)</span></div><input class="fi" id="um-newpwd" type="password" placeholder="Minimo 6 caratteri"></div>`:''}
+    ${!isNew?`<div class="fg"><div class="fl">Nuova password <span style="font-weight:400;font-size:11px;color:var(--g500)">(lascia vuoto per non modificare)</span></div>
+      <input class="fi" id="um-newpwd" type="password" placeholder="Minimo 6 caratteri">
+      <div id="um-pwd-warn" style="display:none">${PWD_WARN_HTML}</div></div>`:''}
   `;
   const btns=[
     {l:'Annulla',c:'bs',a:closeM},
@@ -593,29 +634,52 @@ function openUtenteModal(uid_val){
     }});
   }
   openM(isNew?'+ Nuovo utente':'✎ Modifica utente',body,btns);
+
+  if(isNew){
+    const emailEl=document.getElementById('um-email');
+    const infoEl=document.getElementById('um-email-info');
+    const pwdWrap=document.getElementById('um-pwd-wrap');
+    let debTimer=null;
+    const doCheck=()=>checkEmailLive(emailEl,infoEl,pwdWrap,'servizi-manage-user');
+    emailEl.addEventListener('blur',doCheck);
+    emailEl.addEventListener('input',()=>{
+      clearTimeout(debTimer);
+      if(infoEl){infoEl.style.display='none';infoEl.dataset.exists='';}
+      if(emailEl.value.includes('@')&&emailEl.value.includes('.')){
+        debTimer=setTimeout(doCheck,600);
+      }
+    });
+  }
+  if(!isNew){
+    const pwdEl=document.getElementById('um-newpwd');
+    const warnEl=document.getElementById('um-pwd-warn');
+    if(pwdEl&&warnEl)pwdEl.addEventListener('input',()=>{warnEl.style.display=pwdEl.value.length>0?'':'none';});
+  }
 }
 async function saveUtente(isNew,u){
   const nome=$('um-nome').value.trim(),cognome=$('um-cognome').value.trim();
   const email=$('um-email').value.trim(),ruolo=$('um-ruolo').value,attivo=$('um-attivo').checked;
-  if(!nome||!cognome){toast('Nome e cognome sono obbligatori.','terr');return;}
-  if(isNew&&!email){toast('Email obbligatoria.','terr');return;}
+  if(!nome||!cognome||!email){toast('Compila tutti i campi obbligatori.','terr');return;}
   try{
     if(isNew){
-      const pwd=$('um-pwd').value;
-      if(!pwd||pwd.length<6){toast('Password minimo 6 caratteri.','terr');return;}
-      const res=await callFn('servizi-manage-user',{action:'create',email,password:pwd,nome,cognome,ruolo,attivo});
+      const emailInfo=$('um-email-info');
+      const exists=emailInfo?.dataset.exists==='true';
+      const pwd=$('um-pwd')?.value||'';
+      if(!exists&&pwd.length<6){toast('Password minimo 6 caratteri.','terr');return;}
+      const payload={action:'create',email,nome,cognome,ruolo,attivo:true};
+      if(!exists)payload.password=pwd;
+      const res=await callFn('servizi-manage-user',payload);
       if(!res.ok)throw new Error(res.error||'Errore creazione utente');
-      await loadAll();
-      closeM();renderPage();toast('Utente creato ✓');
+      S.profili.push({id:res.user_id,nome,cognome,email,ruolo,attivo:true});
+      closeM();renderPage();toast(res.auth_created?'Utente creato ✓':'Profilo collegato ✓');
     }else{
       const newpwd=$('um-newpwd')?.value||'';
-      if(newpwd){
-        const res=await callFn('servizi-manage-user',{action:'update',user_id:u.id,password:newpwd,nome,cognome,ruolo,attivo});
-        if(!res.ok)throw new Error(res.error||'Errore aggiornamento');
-      }else{
-        await db('PATCH',T('profili'),{flt:`id=eq.${u.id}`,body:{nome,cognome,ruolo,attivo}});
-      }
-      await loadAll();
+      if(newpwd&&newpwd.length<6){toast('Password minimo 6 caratteri.','terr');return;}
+      const payload={action:'update',user_id:u.id,nome,cognome,ruolo,attivo};
+      if(newpwd)payload.password=newpwd;
+      const res=await callFn('servizi-manage-user',payload);
+      if(!res.ok)throw new Error(res.error||'Errore aggiornamento');
+      S.profili=S.profili.map(x=>x.id===u.id?{...x,nome,cognome,ruolo,attivo}:x);
       closeM();renderPage();toast('Utente aggiornato ✓');
     }
   }catch(e){toast(e.message,'terr');}
