@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#fff">
+<title>Raccolte — Medical Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --verde:#9DBF60;--grigio:#77797a;--grigio-chiaro:#aaaaaa;
+  --navy:#4A4C4D;--blue:#77797a;--blue-mid:#9DBF60;
+  --blue-light:#D5E3B7;--blue-xlight:#EEF5E3;
+  --accent:#9DBF60;--accent-light:#EEF5E3;
+  --red:#C0392B;--red-light:#FDECEA;
+  --green:#9DBF60;--green-light:#EEF5E3;
+  --amber:#c07000;--amber-light:#FFF9E6;
+  --g50:#F8F9F8;--g100:#F0F2EE;--g200:#E2E6DF;--g300:#C8CEC4;
+  --g500:#77797a;--g700:#4A4C4D;--g900:#2A2C2D;
+  --sh-sm:0 1px 3px rgba(74,76,77,.08),0 1px 2px rgba(74,76,77,.05);
+  --sh-md:0 4px 12px rgba(74,76,77,.10);
+  --sh-lg:0 12px 32px rgba(74,76,77,.14),0 4px 10px rgba(74,76,77,.07);
+  --r:10px;--rsm:6px;--rlg:16px;
+  font-family:'Raleway',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:var(--g50);color:var(--g900);font-family:'Raleway',sans-serif;}
+body{min-height:100vh;}
+.hid{display:none!important;}
+button{font-family:'Raleway',sans-serif;cursor:pointer;}
+
+/* Blocco zoom/scroll-bounce iOS + font-size 16px anti-zoom-al-focus */
+html,body{
+  height:100%;min-height:0;overflow:hidden;position:fixed;width:100%;
+  overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;
+}
+input,select,textarea{font-size:16px!important;}
+
+/* SPINNER */
+.spn{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:16px;left:16px;z-index:9999;padding:14px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:opacity .25s;max-width:480px;margin:0 auto;display:flex;align-items:center;gap:10px;justify-content:space-between;}
+#toast.show{pointer-events:auto;opacity:1;}
+#toast .toast-msg{flex:1;word-break:break-word;}
+#toast .toast-copy{flex-shrink:0;background:rgba(0,0,0,.12);border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;color:inherit;font-family:'Raleway',sans-serif;}
+#toast.tok{background:var(--green-light);color:#2d6a2d;border-left:3px solid var(--verde);}
+#toast.terr{background:var(--red-light);color:var(--red);border-left:3px solid var(--red);}
+#toast.tinfo{background:var(--blue-xlight);color:var(--navy);border-left:3px solid var(--verde);}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--g50);z-index:10000;display:flex;align-items:center;justify-content:center;}
+#loading .spn{width:30px;height:30px;border-color:var(--g200);border-top-color:var(--verde);}
+
+/* LOGIN */
+#lp{height:100%;display:flex;align-items:center;justify-content:center;background:var(--g50);padding:20px;overflow-y:auto;}
+.lcard{background:#fff;border-radius:var(--rlg);padding:36px 30px;width:100%;max-width:420px;box-shadow:var(--sh-lg);border:1px solid var(--g200);}
+#login-logo{display:flex;justify-content:center;}
+.lfield{margin-bottom:16px;}
+.lfield label{display:block;font-size:12px;font-weight:600;color:var(--g700);letter-spacing:.5px;margin-bottom:6px;}
+.lfield input{width:100%;padding:13px 14px;border:1px solid var(--g200);border-radius:var(--rsm);background:var(--blue-xlight);font-family:'Raleway',sans-serif;color:var(--g900);outline:none;transition:border-color .2s;}
+.lfield input:focus{border-color:var(--verde);}
+.lbtn{width:100%;padding:14px;background:var(--verde);color:#fff;border:none;border-radius:var(--rsm);font-family:'Raleway',sans-serif;font-weight:700;cursor:pointer;transition:opacity .2s;margin-top:4px;}
+.lbtn:hover{opacity:.88;}
+.lbtn:disabled{opacity:.6;}
+.lerr{background:var(--red-light);color:var(--red);border-radius:var(--rsm);padding:10px 14px;font-size:13px;margin-top:14px;display:none;}
+
+/* APP SHELL */
+#app{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+#topbar{background:#fff;border-bottom:1px solid var(--g200);padding:0 16px;z-index:100;box-shadow:var(--sh-sm);flex-shrink:0;}
+#tb-top{height:54px;display:flex;align-items:center;justify-content:space-between;}
+#tb-right{display:flex;align-items:center;gap:10px;}
+#tb-user{font-size:12px;font-weight:600;color:var(--navy);text-align:right;line-height:1.2;}
+#tb-user small{display:block;font-size:9px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.5px;}
+#lout{font-size:11px;font-weight:600;padding:7px 12px;background:none;border:1px solid var(--g300);border-radius:var(--rsm);color:var(--g500);transition:all .17s;}
+#lout:active{background:var(--g100);}
+
+#main{flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative;}
+
+/* SCROLLABLE VIEW */
+.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px 90px;}
+.view.hid{display:none;}
+
+/* HEADER PAGINA */
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.ph .back{width:38px;height:38px;flex-shrink:0;border-radius:var(--rsm);border:1px solid var(--g200);background:#fff;color:var(--g700);font-size:20px;display:flex;align-items:center;justify-content:center;}
+.ph .back:active{background:var(--g100);}
+.ph h1{font-size:18px;font-weight:800;color:var(--navy);line-height:1.15;}
+.ph .sub{font-size:12px;color:var(--g500);font-weight:500;}
+
+/* BOTTONI */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px 18px;border-radius:var(--r);border:none;font-family:'Raleway',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .17s,transform .05s;letter-spacing:.2px;}
+.btn:active{transform:scale(.985);}
+.btn:disabled{opacity:.5;}
+.btn-primary{background:var(--verde);color:#fff;}
+.btn-ghost{background:#fff;color:var(--g700);border:1px solid var(--g300);}
+.btn-danger{background:var(--red-light);color:var(--red);}
+.btn-amber{background:var(--amber-light);color:var(--amber);border:1px solid #f0d98a;}
+.btn-row{display:flex;gap:10px;}
+.btn-row .btn{flex:1;}
+
+/* FAB / azione fissa in basso */
+.bottom-bar{position:absolute;bottom:0;left:0;right:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,#fff 60%,rgba(255,255,255,0));z-index:20;}
+
+/* CARD SEDE / RACCOLTA */
+.card{background:#fff;border:1px solid var(--g200);border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:10px;overflow:hidden;}
+.card-tap{padding:16px;display:flex;align-items:center;gap:13px;cursor:pointer;transition:background .12s;}
+.card-tap:active{background:var(--g50);}
+.card-icon{width:42px;height:42px;flex-shrink:0;border-radius:11px;background:var(--blue-xlight);color:var(--verde);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;}
+.card-body{flex:1;min-width:0;}
+.card-title{font-size:15px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-meta{font-size:12px;color:var(--g500);margin-top:2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.card-arrow{color:var(--g300);font-size:22px;flex-shrink:0;}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:14px;}
+.search-wrap input{width:100%;padding:12px 14px 12px 40px;border:1px solid var(--g200);border-radius:var(--r);background:#fff;color:var(--g900);outline:none;transition:border-color .2s;}
+.search-wrap input:focus{border-color:var(--verde);}
+.search-wrap::before{content:'🔍';position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:14px;}
+
+/* SECTION LABEL */
+.sec-lbl{font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px;margin:18px 2px 8px;}
+.sec-lbl:first-child{margin-top:0;}
+
+/* TAG / BADGE */
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.tag-incorso{background:var(--amber-light);color:var(--amber);}
+.tag-confermata{background:var(--blue-xlight);color:var(--verde);}
+.tag-versata{background:#E8F0FB;color:#3B7DD8;}
+.tag-chiusa{background:var(--green-light);color:#2d6a2d;}
+.tag-annullata{background:var(--g100);color:var(--g500);}
+.tag-delta{background:var(--red-light);color:var(--red);}
+
+/* EMPTY */
+.empty{text-align:center;padding:50px 20px;color:var(--g500);}
+.empty .ico{font-size:38px;margin-bottom:10px;opacity:.5;}
+.empty .txt{font-size:14px;font-weight:600;}
+.empty .sub{font-size:12px;margin-top:4px;color:var(--g300);}
+
+/* FORM GROUP */
+.fg{margin-bottom:18px;}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--g700);letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase;}
+.fg input,.fg select,.fg textarea{width:100%;padding:14px 14px;border:1px solid var(--g200);border-radius:var(--rsm);font-family:'Raleway',sans-serif;color:var(--g900);background:#fff;outline:none;transition:border-color .2s;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--verde);}
+.fg .hint{font-size:11px;color:var(--g500);margin-top:6px;}
+
+/* IMPORTO INPUT GRANDE */
+.importo-box{background:#fff;border:2px solid var(--g200);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:18px;transition:border-color .2s;}
+.importo-box.focus{border-color:var(--verde);}
+.importo-box label{display:block;font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.importo-input{display:flex;align-items:center;justify-content:center;gap:6px;}
+.importo-input .eur{font-size:30px;font-weight:800;color:var(--g300);}
+.importo-input input{border:none;outline:none;font-family:'Raleway',sans-serif;font-size:40px!important;font-weight:800;color:var(--navy);text-align:center;width:100%;max-width:260px;background:none;}
+.importo-input input::placeholder{color:var(--g300);}
+
+/* DISPLAY IMPORTO (conferma) */
+.importo-display{text-align:center;padding:24px 16px;background:var(--blue-xlight);border-radius:var(--r);margin-bottom:8px;}
+.importo-display .lbl{font-size:11px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.importo-display .val{font-size:46px;font-weight:800;color:var(--navy);line-height:1;}
+
+/* FIRMA — canvas */
+.firma-wrap{margin-bottom:16px;}
+.firma-canvas{width:100%;height:200px;background:#fff;border:2px dashed var(--g300);border-radius:var(--r);touch-action:none;display:block;}
+.firma-canvas.signed{border-style:solid;border-color:var(--verde);}
+.firma-hint{position:absolute;color:var(--g300);font-size:14px;font-weight:600;pointer-events:none;}
+.firma-tools{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.firma-tools .who{font-size:13px;font-weight:700;color:var(--navy);}
+.firma-clear{font-size:12px;font-weight:600;color:var(--g500);background:none;border:1px solid var(--g300);border-radius:var(--rsm);padding:6px 12px;}
+
+/* STEP / PROGRESS */
+.steps{display:flex;align-items:center;gap:4px;margin-bottom:18px;}
+.step{flex:1;height:4px;border-radius:4px;background:var(--g200);}
+.step.done{background:var(--verde);}
+.step.cur{background:var(--verde);opacity:.5;}
+
+/* RIEPILOGO ROW */
+.rec-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--g100);}
+.rec-row:last-child{border-bottom:none;}
+.rec-row .k{font-size:13px;color:var(--g500);font-weight:600;}
+.rec-row .v{font-size:14px;color:var(--navy);font-weight:700;text-align:right;}
+.rec-row .v.ok{color:#2d6a2d;}
+.rec-row .v.warn{color:var(--red);}
+.rec-card{background:#fff;border:1px solid var(--g200);border-radius:var(--r);padding:6px 16px;box-shadow:var(--sh-sm);margin-bottom:16px;}
+
+/* CONFERMA PERSONA — badge stato firma */
+.firmatari{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
+.firmatario{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--g200);border-radius:var(--r);background:#fff;}
+.firmatario.ok{border-color:var(--verde);background:var(--green-light);}
+.firmatario .av{width:40px;height:40px;border-radius:50%;background:var(--g100);color:var(--g500);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;}
+.firmatario.ok .av{background:var(--verde);color:#fff;}
+.firmatario .info{flex:1;min-width:0;}
+.firmatario .nm{font-size:14px;font-weight:700;color:var(--navy);}
+.firmatario .rl{font-size:11px;color:var(--g500);font-weight:600;}
+.firmatario .st{font-size:12px;font-weight:700;color:var(--g400);}
+.firmatario.ok .st{color:#2d6a2d;}
+
+/* RICEVUTA preview */
+.ricevuta-preview{width:100%;border-radius:var(--r);border:1px solid var(--g200);margin-bottom:12px;display:block;}
+.upload-box{border:2px dashed var(--g300);border-radius:var(--r);padding:30px 20px;text-align:center;color:var(--g500);cursor:pointer;transition:all .15s;margin-bottom:16px;}
+.upload-box:active{background:var(--g50);border-color:var(--verde);}
+.upload-box .ico{font-size:34px;margin-bottom:8px;}
+.upload-box .txt{font-size:14px;font-weight:700;color:var(--navy);}
+.upload-box .sub{font-size:12px;margin-top:3px;}
+
+/* RACCOLTA riga lista (storico) con delta */
+.rlist-card{background:#fff;border:1px solid var(--g200);border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:10px;padding:14px 16px;}
+.rlist-card.delta{border-color:var(--red);background:var(--red-light);}
+.rlist-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;}
+.rlist-sede{font-size:14px;font-weight:700;color:var(--navy);}
+.rlist-date{font-size:11px;color:var(--g500);font-weight:600;margin-top:2px;}
+.rlist-imp{font-size:18px;font-weight:800;color:var(--navy);text-align:right;white-space:nowrap;}
+.rlist-bot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+
+/* DELTA inline */
+.delta-line{font-size:12px;font-weight:700;color:var(--red);}
+
+@supports(padding:max(0px)){
+  .bottom-bar{padding-bottom:max(12px,env(safe-area-inset-bottom));}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><span class="spn"></span></div>
+<div id="toast"></div>
+
+<!-- LOGIN -->
+<div id="lp">
+  <div class="lcard">
+    <div id="login-logo"></div>
+    <div style="margin-top:14px;font-size:13px;color:var(--grigio);text-align:center">Accesso riservato al personale autorizzato</div>
+    <div id="lerr" class="lerr"></div>
+    <div class="lfield" style="margin-top:18px"><label>E-Mail</label><input type="email" id="lem" placeholder="nome@medicalgroup.it" autocomplete="username" inputmode="email"></div>
+    <div class="lfield"><label>Password</label><input type="password" id="lpw" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="lbtn" id="lbtn" onclick="doLogin()">Accedi</button>
+    <div id="login-ver" style="margin-top:14px;font-size:10px;color:var(--grigio-chiaro);text-align:center;letter-spacing:.5px"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hid">
+  <div id="topbar">
+    <div id="tb-top">
+      <div id="tb-logo"></div>
+      <div id="tb-right">
+        <div id="tb-user"></div>
+        <button id="lout" onclick="doLogout()">Esci</button>
+      </div>
+    </div>
+  </div>
+  <main id="main">
+    <!-- le view vengono iniettate qui -->
+    <div id="v-home"   class="view"></div>
+    <div id="v-sedi"   class="view hid"></div>
+    <div id="v-flow"   class="view hid"></div>
+    <div id="v-storico" class="view hid"></div>
+  </main>
+</div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════
+const CFG={
+  URL:'https://iczsdqcnvauopwkuspti.supabase.co',
+  KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljenNkcWNudmF1b3B3a3VzcHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTQ0MjMsImV4cCI6MjA5MjQzMDQyM30.SmcRHPLM2PEq4Hn-5CQhMyQKoz0PN_0lbN_X3l9MNUE',
+  FN:'https://iczsdqcnvauopwkuspti.supabase.co/functions/v1',
+};
+const T=n=>`servizi_${n}`;
+const BUCKET_FIRME='servizi-firme';
+const BUCKET_RICEVUTE='servizi-ricevute';
+
+// STATO
+const S={
+  user:null,token:null,
+  profili:[],sedi:[],sedeReferenti:[],raccolte:[],
+  view:'home',
+  // flow corrente
+  flow:null,          // {step, sedeId, raccoltaId, importo, referenteId, firmaRef, firmaInc, ...}
+};
+
+// UTILS
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const p2=n=>String(n).padStart(2,'0');
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2,11));
+
+function fmt(d){if(!d)return'—';const dt=typeof d==='string'?new Date(d.length===10?d+'T00:00:00':d):d;return dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDT(d){if(!d)return'—';const dt=new Date(d);return dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});}
+function eur(n){if(n==null||n==='')return'—';return Number(n).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';}
+function initials(p){if(!p)return'?';return((p.nome||'')[0]||'').toUpperCase()+((p.cognome||'')[0]||'').toUpperCase();}
+function fullName(p){return p?`${p.nome||''} ${p.cognome||''}`.trim():'—';}
+function profById(id){return S.profili.find(p=>p.id===id);}
+function sedeById(id){return S.sedi.find(s=>s.id===id);}
+
+let _tid,_lastToastMsg='';
+function toast(msg,type='ok'){
+  const el=$('toast');clearTimeout(_tid);_lastToastMsg=msg;
+  const isErr=type==='terr';
+  el.innerHTML=isErr
+    ?`<span class="toast-msg">${esc(msg)}</span><button class="toast-copy" onclick="copyToastError()">Copia</button>`
+    :`<span class="toast-msg">${esc(msg)}</span>`;
+  el.className=`show t${type}`;
+  _tid=setTimeout(()=>el.className='',isErr?12000:3200);
+}
+function copyToastError(){
+  if(navigator.clipboard){navigator.clipboard.writeText(_lastToastMsg).then(()=>{$('toast').querySelector('.toast-msg').textContent='Copiato ✓';}).catch(()=>alert(_lastToastMsg));}
+  else alert(_lastToastMsg);
+}
+
+// ══════════════════════════════════════════
+// SUPABASE REST
+// ══════════════════════════════════════════
+async function db(method,table,opts={}){
+  const{flt='',body=null,sel='*',ord='',lim=''}=opts;
+  let url=`${CFG.URL}/rest/v1/${table}?select=${sel}`;
+  if(flt)url+=`&${flt}`;if(ord)url+=`&order=${ord}`;if(lim)url+=`&limit=${lim}`;
+  const headers={'apikey':CFG.KEY,'Authorization':`Bearer ${S.token||CFG.KEY}`,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':(method==='PATCH'?'return=representation':'')};
+  const res=await fetch(url,{method,headers,body:body?JSON.stringify(body):undefined});
+  if(!res.ok){const e=await res.text();throw new Error(`${method} ${table}: ${e}`);}
+  return method==='DELETE'?null:res.json();
+}
+async function supaLogin(email,pwd){
+  const res=await fetch(`${CFG.URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':CFG.KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pwd})});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error_description||data.error||data.msg||'Errore di autenticazione');
+  return data;
+}
+// Upload su Supabase Storage → ritorna l'URL pubblico
+async function uploadToStorage(bucket,path,blob,contentType){
+  const res=await fetch(`${CFG.URL}/storage/v1/object/${bucket}/${path}`,{
+    method:'POST',
+    headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token||CFG.KEY}`,'Content-Type':contentType,'x-upsert':'true'},
+    body:blob,
+  });
+  if(!res.ok){const e=await res.text();throw new Error(`Upload ${bucket}: ${e}`);}
+  return `${CFG.URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+function dataURLtoBlob(dataURL){
+  const[meta,b64]=dataURL.split(',');
+  const mime=meta.match(/:(.*?);/)[1];
+  const bin=atob(b64);const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+async function writeLog(azione,dettaglio){
+  try{await db('POST',T('log'),{body:[{utente_id:S.user?.id||null,azione,dettaglio:dettaglio||null}]});}catch(e){/* non bloccante */}
+}
+
+// ══════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════
+async function doLogin(){
+  const email=$('lem').value.trim(),pwd=$('lpw').value;
+  const btn=$('lbtn'),err=$('lerr');
+  err.style.display='none';
+  if(!email||!pwd){err.textContent='Inserisci email e password.';err.style.display='block';return;}
+  btn.innerHTML='<span class="spn"></span> Accesso…';btn.disabled=true;
+  try{
+    const auth=await supaLogin(email,pwd);
+    S.token=auth.access_token;
+    const rows=await db('GET',T('profili'),{flt:`id=eq.${auth.user.id}`});
+    if(!rows?.length)throw new Error('Profilo non trovato. Contatta l\'amministratore.');
+    if(rows[0].attivo===false)throw new Error('Utente disabilitato. Contatta l\'amministratore.');
+    S.user=rows[0];
+    await loadAll();
+    $('lp').classList.add('hid');$('app').classList.remove('hid');
+    initTopbar();
+    goView('home');
+  }catch(e){err.textContent=e.message;err.style.display='block';btn.innerHTML='Accedi';btn.disabled=false;}
+}
+function doLogout(){
+  S.user=null;S.token=null;S.flow=null;
+  $('app').classList.add('hid');$('lp').classList.remove('hid');
+  $('lem').value='';$('lpw').value='';
+  $('lbtn').innerHTML='Accedi';$('lbtn').disabled=false;
+}
+
+// ══════════════════════════════════════════
+// LOAD
+// ══════════════════════════════════════════
+async function loadAll(){
+  const[profili,sedi,sr,raccolte]=await Promise.all([
+    db('GET',T('profili'),{ord:'cognome.asc,nome.asc'}),
+    db('GET',T('sedi'),{ord:'nome.asc'}),
+    db('GET',T('sede_referenti')),
+    db('GET',T('raccolte'),{ord:'created_at.desc',lim:'200'}),
+  ]);
+  S.profili=profili||[];S.sedi=sedi||[];S.sedeReferenti=sr||[];S.raccolte=raccolte||[];
+}
+async function reloadRaccolte(){
+  S.raccolte=await db('GET',T('raccolte'),{ord:'created_at.desc',lim:'200'})||[];
+}
+
+// referenti associati a una sede (con ruolo referente o admin)
+function referentiDiSede(sedeId){
+  const ids=S.sedeReferenti.filter(x=>x.sede_id===sedeId).map(x=>x.profilo_id);
+  return S.profili.filter(p=>ids.includes(p.id));
+}
+
+// ══════════════════════════════════════════
+// LOGO (standard Medical Group)
+// ══════════════════════════════════════════
+function logoSVG(small){const w=small?28:36,h=small?22:28;return `<svg width="${w}" height="${h}" viewBox="0 0 90 70" fill="none"><circle cx="28" cy="22" r="19" stroke="#D5E3B7" stroke-width="3.5" fill="none"/><circle cx="40" cy="38" r="24" stroke="#77797A" stroke-width="3.5" fill="none"/></svg>`;}
+function logoHTML(small=false){return `<div style="display:flex;align-items:center;gap:${small?6:10}px;">${logoSVG(small)}<div style="line-height:1.15;"><div style="font-weight:300;font-size:${small?12:15}px;letter-spacing:4px;text-transform:uppercase;"><span style="color:var(--grigio)">MEDICAL</span><span style="color:var(--verde)">GROUP</span></div><div style="font-size:9px;letter-spacing:2px;color:var(--grigio-chiaro);text-transform:uppercase;font-weight:500;">Raccolte</div></div></div>`;}
+
+function initTopbar(){
+  $('tb-logo').innerHTML=logoHTML(true);
+  const r=S.user.ruolo;
+  $('tb-user').innerHTML=`${esc(fullName(S.user))}<small>${esc(r)}</small>`;
+}
+
+// ══════════════════════════════════════════
+// NAVIGAZIONE VIEW
+// ══════════════════════════════════════════
+function goView(v){
+  S.view=v;
+  ['home','sedi','flow','storico'].forEach(x=>$('v-'+x).classList.toggle('hid',x!==v));
+  if(v==='home')renderHome();
+  else if(v==='sedi')renderSedi();
+  else if(v==='storico')renderStorico();
+  // 'flow' viene renderizzata dalle funzioni di step
+  $('main').scrollTop=0;
+  const cur=$('v-'+v);if(cur)cur.scrollTop=0;
+}
+
+// ══════════════════════════════════════════
+// HOME
+// ══════════════════════════════════════════
+function renderHome(){
+  const aperte=S.raccolte.filter(r=>['in_corso','confermata','versata'].includes(r.stato));
+  const conDelta=S.raccolte.filter(r=>r.delta!=null&&Number(r.delta)!==0);
+  $('v-home').innerHTML=`
+    <div class="ph"><div><h1>Ciao, ${esc(S.user.nome)}</h1><div class="sub">Cosa vuoi fare?</div></div></div>
+
+    <div class="card"><div class="card-tap" onclick="goView('sedi')">
+      <div class="card-icon">+</div>
+      <div class="card-body"><div class="card-title">Nuova raccolta</div><div class="card-meta">Avvia un prelievo presso una sede</div></div>
+      <div class="card-arrow">›</div>
+    </div></div>
+
+    <div class="card"><div class="card-tap" onclick="goView('storico')">
+      <div class="card-icon" style="background:#E8F0FB;color:#3B7DD8">≡</div>
+      <div class="card-body"><div class="card-title">Le mie raccolte</div><div class="card-meta">${S.raccolte.length} totali · ${aperte.length} da completare${conDelta.length?` · <span style="color:var(--red);font-weight:700">${conDelta.length} con delta</span>`:''}</div></div>
+      <div class="card-arrow">›</div>
+    </div></div>
+
+    ${aperte.length?`<div class="sec-lbl">Da completare</div>${aperte.slice(0,5).map(rRowHTML).join('')}`:''}
+  `;
+}
+
+// ══════════════════════════════════════════
+// SEDI (scelta sede → avvia flow)
+// ══════════════════════════════════════════
+function renderSedi(){
+  const sedi=S.sedi.filter(s=>s.attivo!==false);
+  $('v-sedi').innerHTML=`
+    <div class="ph"><button class="back" onclick="goView('home')">‹</button><div><h1>Scegli la sede</h1><div class="sub">Sede che stai visitando</div></div></div>
+    <div class="search-wrap"><input id="sede-search" placeholder="Cerca sede..." oninput="filterSedi(this.value)"></div>
+    <div id="sedi-list">${sedi.map(sedeCardHTML).join('')||emptyHTML('🏢','Nessuna sede','Chiedi a un amministratore di crearne')}</div>
+  `;
+}
+function sedeCardHTML(s){
+  const nref=referentiDiSede(s.id).length;
+  return `<div class="card"><div class="card-tap" onclick="startFlow('${s.id}')">
+    <div class="card-icon">${esc((s.nome||'?')[0].toUpperCase())}</div>
+    <div class="card-body"><div class="card-title">${esc(s.nome)}</div><div class="card-meta">${s.citta?esc(s.citta)+' · ':''}${nref} referente${nref===1?'':'i'}</div></div>
+    <div class="card-arrow">›</div>
+  </div></div>`;
+}
+function filterSedi(q){
+  q=(q||'').toLowerCase();
+  const sedi=S.sedi.filter(s=>s.attivo!==false&&(`${s.nome} ${s.citta||''}`.toLowerCase().includes(q)));
+  $('sedi-list').innerHTML=sedi.map(sedeCardHTML).join('')||emptyHTML('🔍','Nessun risultato','');
+}
+
+function emptyHTML(ico,txt,sub){return `<div class="empty"><div class="ico">${ico}</div><div class="txt">${esc(txt)}</div>${sub?`<div class="sub">${esc(sub)}</div>`:''}</div>`;}
+
+// riga raccolta compatta (home)
+function rRowHTML(r){
+  const s=sedeById(r.sede_id);
+  return `<div class="card"><div class="card-tap" onclick="openRaccolta('${r.id}')">
+    <div class="card-icon" style="background:var(--amber-light);color:var(--amber)">€</div>
+    <div class="card-body"><div class="card-title">${esc(s?.nome||'Sede')}</div><div class="card-meta">${eur(r.importo_dichiarato)} · ${statoTag(r.stato)}</div></div>
+    <div class="card-arrow">›</div>
+  </div></div>`;
+}
+function statoTag(st){const lbl={in_corso:'In corso',confermata:'Confermata',versata:'Versata',chiusa:'Chiusa',annullata:'Annullata'}[st]||st;return `<span class="tag tag-${st}">${lbl}</span>`;}
+
+// ══════════════════════════════════════════
+// FLOW — le 4 fasi
+// step: 'importo' | 'firme' | 'riepilogo' | 'versamento'
+// ══════════════════════════════════════════
+function startFlow(sedeId){
+  S.flow={step:'importo',sedeId,raccoltaId:null,importo:'',referenteId:'',firmaRef:null,firmaInc:null,confRef:null,confInc:null};
+  goView('flow');
+  renderStepImporto();
+}
+
+// Apre una raccolta esistente e va allo step giusto
+function openRaccolta(id){
+  const r=S.raccolte.find(x=>x.id===id);
+  if(!r)return;
+  S.flow={
+    step:'importo',sedeId:r.sede_id,raccoltaId:r.id,
+    importo:r.importo_dichiarato!=null?String(r.importo_dichiarato).replace('.',','):'',
+    referenteId:r.referente_id||'',
+    firmaRef:r.firma_referente_url,firmaInc:r.firma_incaricato_url,
+    confRef:r.conf_referente_at,confInc:r.conf_incaricato_at,
+  };
+  goView('flow');
+  if(r.stato==='chiusa'||r.stato==='annullata'){renderStepRiepilogo(true);}
+  else if(r.stato==='versata'){renderStepRiepilogo(true);}
+  else if(r.stato==='confermata'){renderStepVersamento();}
+  else if(r.firma_referente_url&&r.firma_incaricato_url){renderStepRiepilogo();}
+  else {renderStepImporto();}
+}
+
+function stepsHTML(cur){
+  const order=['importo','firme','riepilogo','versamento'];
+  const ci=order.indexOf(cur);
+  return `<div class="steps">${order.map((s,i)=>`<div class="step ${i<ci?'done':i===ci?'cur':''}"></div>`).join('')}</div>`;
+}
+
+// ── FASE 2.2 — inserimento importo + scelta referente ──────────────────
+function renderStepImporto(){
+  const f=S.flow;const sede=sedeById(f.sedeId);
+  const refs=referentiDiSede(f.sedeId);
+  $('v-flow').innerHTML=`
+    <div class="ph"><button class="back" onclick="abortFlow()">‹</button><div><h1>${esc(sede?.nome||'Sede')}</h1><div class="sub">${sede?.citta?esc(sede.citta)+' · ':''}Nuova raccolta</div></div></div>
+    ${stepsHTML('importo')}
+
+    <div class="importo-box" id="imp-box">
+      <label>Totale condiviso al tavolo</label>
+      <div class="importo-input">
+        <span class="eur">€</span>
+        <input id="imp-val" inputmode="decimal" placeholder="0,00" value="${esc(f.importo)}"
+          oninput="onImportoInput(this)" onfocus="$('imp-box').classList.add('focus')" onblur="$('imp-box').classList.remove('focus')">
+      </div>
+    </div>
+
+    <div class="fg">
+      <label>Referente di sede</label>
+      <select id="imp-ref">
+        <option value="">— Seleziona referente —</option>
+        ${refs.map(p=>`<option value="${p.id}" ${p.id===f.referenteId?'selected':''}>${esc(fullName(p))}</option>`).join('')}
+      </select>
+      ${refs.length?'':'<div class="hint" style="color:var(--red)">Nessun referente associato a questa sede. Va aggiunto da un amministratore.</div>'}
+    </div>
+
+    <div class="rec-card" style="background:var(--blue-xlight);border-color:var(--blue-light)">
+      <div style="padding:10px 0;font-size:12.5px;color:var(--navy);line-height:1.5">
+        <strong>Promemoria:</strong> il denaro è stato contato due volte (referente + incaricato) prima di inserirlo qui. Non va riposto in buste prima dell'accordo sulla cifra.
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <button class="btn btn-primary" id="imp-next" onclick="submitImporto()">Procedi alle firme</button>
+    </div>
+  `;
+}
+function onImportoInput(el){
+  let v=el.value.replace(/[^0-9,]/g,'');
+  const parts=v.split(',');
+  if(parts.length>2)v=parts[0]+','+parts.slice(1).join('');
+  if(parts[1]?.length>2)v=parts[0]+','+parts[1].slice(0,2);
+  el.value=v;S.flow.importo=v;
+}
+function parseImporto(v){if(!v)return null;return parseFloat(String(v).replace(/\./g,'').replace(',','.'));}
+
+async function submitImporto(){
+  const f=S.flow;
+  const imp=parseImporto($('imp-val').value);
+  const refId=$('imp-ref').value;
+  if(!imp||imp<=0){toast('Inserisci un importo valido.','terr');return;}
+  if(!refId){toast('Seleziona il referente di sede.','terr');return;}
+  f.importo=$('imp-val').value;f.referenteId=refId;
+  const btn=$('imp-next');btn.innerHTML='<span class="spn"></span> Salvataggio…';btn.disabled=true;
+  try{
+    if(!f.raccoltaId){
+      const[row]=await db('POST',T('raccolte'),{body:[{
+        sede_id:f.sedeId,incaricato_id:S.user.id,referente_id:refId,
+        importo_dichiarato:imp,stato:'in_corso',
+      }]});
+      f.raccoltaId=row.id;
+      await writeLog('raccolta_creata',`Sede ${sedeById(f.sedeId)?.nome} · ${eur(imp)}`);
+    }else{
+      await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{referente_id:refId,importo_dichiarato:imp}});
+    }
+    await reloadRaccolte();
+    renderStepFirme();
+  }catch(e){toast(e.message,'terr');btn.innerHTML='Procedi alle firme';btn.disabled=false;}
+}
+
+// ── FASE 2.2 — doppia firma + conferma importo ─────────────────────────
+function renderStepFirme(){
+  const f=S.flow;
+  const ref=profById(f.referenteId),inc=S.user;
+  $('v-flow').innerHTML=`
+    <div class="ph"><button class="back" onclick="renderStepImporto()">‹</button><div><h1>Conferma e firma</h1><div class="sub">Uno alla volta, sullo stesso telefono</div></div></div>
+    ${stepsHTML('firme')}
+
+    <div class="importo-display"><div class="lbl">Importo da confermare</div><div class="val">${eur(parseImporto(f.importo))}</div></div>
+
+    <div class="firmatari" style="margin-top:16px">
+      <div class="firmatario ${f.confRef?'ok':''}" id="fm-ref">
+        <div class="av">${esc(initials(ref))}</div>
+        <div class="info"><div class="nm">${esc(fullName(ref))}</div><div class="rl">Referente di sede</div></div>
+        <div class="st">${f.confRef?'✓ Firmato':'In attesa'}</div>
+      </div>
+      <div class="firmatario ${f.confInc?'ok':''}" id="fm-inc">
+        <div class="av">${esc(initials(inc))}</div>
+        <div class="info"><div class="nm">${esc(fullName(inc))}</div><div class="rl">Incaricato ritiratore</div></div>
+        <div class="st">${f.confInc?'✓ Firmato':'In attesa'}</div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      ${!f.confRef
+        ?`<button class="btn btn-primary" onclick="openFirma('ref')">Firma referente</button>`
+        :!f.confInc
+          ?`<button class="btn btn-primary" onclick="openFirma('inc')">Firma incaricato</button>`
+          :`<button class="btn btn-primary" onclick="renderStepRiepilogo()">Vai al riepilogo</button>`}
+    </div>
+  `;
+}
+
+// pannello firma a tutto schermo
+let _sig=null;
+function openFirma(who){
+  const f=S.flow;
+  const persona=who==='ref'?profById(f.referenteId):S.user;
+  const v=$('v-flow');
+  v.innerHTML=`
+    <div class="ph"><button class="back" onclick="renderStepFirme()">‹</button><div><h1>Firma</h1><div class="sub">${esc(fullName(persona))}</div></div></div>
+    <div class="importo-display" style="padding:16px"><div class="lbl">Confermi questo importo?</div><div class="val">${eur(parseImporto(f.importo))}</div></div>
+    <div class="firma-wrap" style="position:relative;margin-top:16px">
+      <div class="firma-hint" id="firma-hint" style="left:50%;top:50%;transform:translate(-50%,-50%)">✍️ Firma qui con il dito</div>
+      <canvas id="firma-canvas" class="firma-canvas"></canvas>
+      <div class="firma-tools">
+        <div class="who">${esc(fullName(persona))}</div>
+        <button class="firma-clear" onclick="clearFirma()">Cancella</button>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="renderStepFirme()">Annulla</button>
+        <button class="btn btn-primary" id="firma-confirm" onclick="confirmFirma('${who}')" disabled>Conferma ${eur(parseImporto(f.importo))}</button>
+      </div>
+    </div>
+  `;
+  setTimeout(()=>initCanvas(who),50);
+}
+function initCanvas(who){
+  const cv=$('firma-canvas');if(!cv)return;
+  const rect=cv.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  cv.width=rect.width*dpr;cv.height=rect.height*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.lineWidth=2.6;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#2A2C2D';
+  let drawing=false,last=null,hasInk=false;
+  function pos(e){const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+  function start(e){e.preventDefault();drawing=true;last=pos(e);}
+  function move(e){if(!drawing)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;if(!hasInk){hasInk=true;cv.classList.add('signed');$('firma-hint').style.display='none';$('firma-confirm').disabled=false;}}
+  function end(e){drawing=false;}
+  cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+  cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
+  _sig={cv,ctx,clear:()=>{ctx.clearRect(0,0,cv.width,cv.height);hasInk=false;cv.classList.remove('signed');$('firma-hint').style.display='';$('firma-confirm').disabled=true;},hasInk:()=>hasInk};
+}
+function clearFirma(){if(_sig)_sig.clear();}
+
+async function confirmFirma(who){
+  const f=S.flow;
+  if(!_sig||!_sig.hasInk()){toast('Firma prima di confermare.','terr');return;}
+  const btn=$('firma-confirm');btn.innerHTML='<span class="spn"></span> Salvataggio…';btn.disabled=true;
+  try{
+    const dataURL=_sig.cv.toDataURL('image/png');
+    const blob=dataURLtoBlob(dataURL);
+    const path=`${f.raccoltaId}/${who}_${Date.now()}.png`;
+    const url=await uploadToStorage(BUCKET_FIRME,path,blob,'image/png');
+    const now=new Date().toISOString();
+    const patch=who==='ref'
+      ?{firma_referente_url:url,conf_referente_at:now}
+      :{firma_incaricato_url:url,conf_incaricato_at:now};
+    // se è la seconda firma → stato confermata
+    const altroFirmato=who==='ref'?f.confInc:f.confRef;
+    if(altroFirmato)patch.stato='confermata';
+    await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:patch});
+    if(who==='ref'){f.firmaRef=url;f.confRef=now;}else{f.firmaInc=url;f.confInc=now;}
+    await writeLog('firma_apposta',`${who==='ref'?'Referente':'Incaricato'} · raccolta ${f.raccoltaId}`);
+    await reloadRaccolte();
+    toast('Firma registrata ✓','ok');
+    if(f.confRef&&f.confInc)renderStepRiepilogo();
+    else renderStepFirme();
+  }catch(e){toast(e.message,'terr');btn.innerHTML='Conferma';btn.disabled=false;}
+}
+
+// ── FASE 2.3 — riepilogo + termina operazione ─────────────────────────
+function renderStepRiepilogo(readonly){
+  const f=S.flow;
+  const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
+  const sede=sedeById(f.sedeId),ref=profById(f.referenteId),inc=S.user;
+  const versata=['versata','chiusa'].includes(r.stato);
+  $('v-flow').innerHTML=`
+    <div class="ph"><button class="back" onclick="${readonly?"goView('storico')":"renderStepFirme()"}">‹</button><div><h1>Riepilogo</h1><div class="sub">${esc(sede?.nome||'')}</div></div></div>
+    ${stepsHTML(versata?'versamento':'riepilogo')}
+
+    <div class="importo-display"><div class="lbl">Totale concordato</div><div class="val">${eur(r.importo_dichiarato)}</div></div>
+
+    <div class="rec-card" style="margin-top:16px">
+      <div class="rec-row"><span class="k">Sede</span><span class="v">${esc(sede?.nome||'—')}</span></div>
+      <div class="rec-row"><span class="k">Referente</span><span class="v">${esc(fullName(ref))}</span></div>
+      <div class="rec-row"><span class="k">Incaricato</span><span class="v">${esc(fullName(inc))}</span></div>
+      <div class="rec-row"><span class="k">Firma referente</span><span class="v ok">${r.conf_referente_at?'✓ '+fmtDT(r.conf_referente_at):'—'}</span></div>
+      <div class="rec-row"><span class="k">Firma incaricato</span><span class="v ok">${r.conf_incaricato_at?'✓ '+fmtDT(r.conf_incaricato_at):'—'}</span></div>
+      <div class="rec-row"><span class="k">Stato</span><span class="v">${statoTag(r.stato)}</span></div>
+      ${r.importo_versato!=null?`<div class="rec-row"><span class="k">Versato</span><span class="v">${eur(r.importo_versato)}</span></div>`:''}
+      ${r.delta!=null&&Number(r.delta)!==0?`<div class="rec-row"><span class="k">Delta</span><span class="v warn">${eur(r.delta)}</span></div>`:''}
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:8px">
+      ${r.firma_referente_url?`<img src="${esc(r.firma_referente_url)}" style="flex:1;height:70px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+      ${r.firma_incaricato_url?`<img src="${esc(r.firma_incaricato_url)}" style="flex:1;height:70px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+    </div>
+
+    <div class="bottom-bar">
+      ${versata
+        ? (r.stato==='versata'
+            ? `<button class="btn btn-primary" onclick="renderStepVersamento()">Completa versamento</button>`
+            : `<button class="btn btn-ghost" onclick="goView('home')">Torna alla home</button>`)
+        : `<button class="btn btn-primary" onclick="renderStepVersamento()">Termina e vai al versamento</button>`}
+    </div>
+  `;
+}
+
+// ── FASE 3+4 — versamento + ricevuta + chiusura ───────────────────────
+function renderStepVersamento(){
+  const f=S.flow;
+  const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
+  f.ricevutaUrl=f.ricevutaUrl||r.ricevuta_url||null;
+  $('v-flow').innerHTML=`
+    <div class="ph"><button class="back" onclick="renderStepRiepilogo()">‹</button><div><h1>Versamento</h1><div class="sub">Banca o cash-in sede centrale</div></div></div>
+    ${stepsHTML('versamento')}
+
+    <div class="rec-card" style="background:var(--blue-xlight);border-color:var(--blue-light)">
+      <div class="rec-row" style="border:none"><span class="k">Importo raccolto</span><span class="v">${eur(r.importo_dichiarato)}</span></div>
+    </div>
+
+    <div class="fg">
+      <label>Importo effettivamente versato</label>
+      <div class="importo-box" id="vers-box" style="margin-bottom:0">
+        <div class="importo-input"><span class="eur">€</span>
+          <input id="vers-val" inputmode="decimal" placeholder="0,00" value="${r.importo_versato!=null?String(r.importo_versato).replace('.',','):''}"
+            oninput="onImportoInput2(this)" onfocus="$('vers-box').classList.add('focus')" onblur="$('vers-box').classList.remove('focus')">
+        </div>
+      </div>
+    </div>
+
+    <label class="fg" style="display:block"><span style="display:block;font-size:11px;font-weight:700;color:var(--g700);letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase">Ricevuta di versamento</span></label>
+    <div id="ricevuta-zone">
+      ${f.ricevutaUrl
+        ?`<img src="${esc(f.ricevutaUrl)}" class="ricevuta-preview"><button class="btn btn-ghost" onclick="document.getElementById('ric-file').click()">Sostituisci foto</button>`
+        :`<div class="upload-box" onclick="document.getElementById('ric-file').click()"><div class="ico">📷</div><div class="txt">Fotografa o carica la ricevuta</div><div class="sub">JPG o PNG</div></div>`}
+    </div>
+    <input type="file" id="ric-file" accept="image/*" capture="environment" style="display:none" onchange="onRicevutaPick(this)">
+
+    <div class="bottom-bar">
+      <button class="btn btn-primary" id="vers-done" onclick="chiudiCiclo()">Termina operazione</button>
+    </div>
+  `;
+}
+function onImportoInput2(el){onImportoInput(el);}
+
+async function onRicevutaPick(input){
+  const file=input.files&&input.files[0];if(!file)return;
+  const f=S.flow;
+  const zone=$('ricevuta-zone');zone.innerHTML=`<div class="upload-box"><span class="spn" style="border-color:var(--g200);border-top-color:var(--verde)"></span><div class="txt" style="margin-top:8px">Caricamento…</div></div>`;
+  try{
+    const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+    const path=`${f.raccoltaId}/ricevuta_${Date.now()}.${ext}`;
+    const url=await uploadToStorage(BUCKET_RICEVUTE,path,file,file.type||'image/jpeg');
+    f.ricevutaUrl=url;
+    await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{ricevuta_url:url}});
+    zone.innerHTML=`<img src="${esc(url)}" class="ricevuta-preview"><button class="btn btn-ghost" onclick="document.getElementById('ric-file').click()">Sostituisci foto</button>`;
+    toast('Ricevuta caricata ✓','ok');
+  }catch(e){toast(e.message,'terr');zone.innerHTML=`<div class="upload-box" onclick="document.getElementById('ric-file').click()"><div class="ico">📷</div><div class="txt">Riprova</div></div>`;}
+}
+
+async function chiudiCiclo(){
+  const f=S.flow;
+  const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
+  const versato=parseImporto($('vers-val').value);
+  if(versato==null||versato<0){toast('Inserisci l\'importo versato.','terr');return;}
+  if(!f.ricevutaUrl){toast('Carica la ricevuta di versamento.','terr');return;}
+  const delta=+(versato-Number(r.importo_dichiarato)).toFixed(2);
+  const btn=$('vers-done');btn.innerHTML='<span class="spn"></span> Chiusura…';btn.disabled=true;
+  try{
+    await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{
+      importo_versato:versato,delta,versato_at:new Date().toISOString(),stato:'chiusa',
+    }});
+    await writeLog('raccolta_chiusa',`${eur(r.importo_dichiarato)} → versato ${eur(versato)} · delta ${eur(delta)}`);
+    await reloadRaccolte();
+    if(delta!==0)toast(`Ciclo chiuso — ATTENZIONE delta ${eur(delta)}`,'terr');
+    else toast('Ciclo chiuso correttamente ✓','ok');
+    S.flow=null;
+    goView('storico');
+  }catch(e){toast(e.message,'terr');btn.innerHTML='Termina operazione';btn.disabled=false;}
+}
+
+function abortFlow(){
+  // se la raccolta è solo creata e vuota, la lasciamo in_corso (recuperabile da storico)
+  S.flow=null;goView('home');
+}
+
+// ══════════════════════════════════════════
+// STORICO
+// ══════════════════════════════════════════
+let _storFilter='tutte';
+function renderStorico(){
+  $('v-storico').innerHTML=`
+    <div class="ph"><button class="back" onclick="goView('home')">‹</button><div><h1>Le mie raccolte</h1><div class="sub">${S.raccolte.length} totali</div></div></div>
+    <div class="search-wrap"><input id="stor-search" placeholder="Cerca per sede..." oninput="renderStoricoList()"></div>
+    <div style="display:flex;gap:7px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px">
+      ${['tutte','in_corso','confermata','versata','chiusa'].map(s=>`<button onclick="setStorFilter('${s}')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid ${_storFilter===s?'var(--verde)':'var(--g200)'};background:${_storFilter===s?'var(--blue-xlight)':'#fff'};color:${_storFilter===s?'var(--verde)':'var(--g500)'}">${{tutte:'Tutte',in_corso:'In corso',confermata:'Confermate',versata:'Versate',chiusa:'Chiuse'}[s]}</button>`).join('')}
+    </div>
+    <div id="stor-list"></div>
+  `;
+  renderStoricoList();
+}
+function setStorFilter(s){_storFilter=s;renderStorico();}
+function renderStoricoList(){
+  const q=($('stor-search')?.value||'').toLowerCase();
+  let list=S.raccolte.slice();
+  if(_storFilter!=='tutte')list=list.filter(r=>r.stato===_storFilter);
+  if(q)list=list.filter(r=>(sedeById(r.sede_id)?.nome||'').toLowerCase().includes(q));
+  $('stor-list').innerHTML=list.map(storCardHTML).join('')||emptyHTML('📭','Nessuna raccolta','');
+}
+function storCardHTML(r){
+  const sede=sedeById(r.sede_id);
+  const hasDelta=r.delta!=null&&Number(r.delta)!==0;
+  return `<div class="rlist-card ${hasDelta?'delta':''}" onclick="openRaccolta('${r.id}')">
+    <div class="rlist-top">
+      <div><div class="rlist-sede">${esc(sede?.nome||'Sede')}</div><div class="rlist-date">${fmtDT(r.created_at)}</div></div>
+      <div class="rlist-imp">${eur(r.importo_dichiarato)}</div>
+    </div>
+    <div class="rlist-bot">
+      ${statoTag(r.stato)}
+      ${hasDelta?`<span class="delta-line">DELTA ${eur(r.delta)}</span>`:(r.importo_versato!=null?`<span style="font-size:12px;color:var(--g500);font-weight:600">Versato ${eur(r.importo_versato)}</span>`:'')}
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',async()=>{
+  $('login-logo').innerHTML=logoHTML(false);
+  try{
+    const res=await fetch('https://api.github.com/repos/ictmedicalgroup-sudo/servizi/commits?per_page=1');
+    if(res.ok){const[c]=await res.json();const d=new Date(c.commit.committer.date);const s='build '+d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});$('login-ver').textContent=s;}
+  }catch(e){}
+  $('lpw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  $('lem').addEventListener('keydown',e=>{if(e.key==='Enter')$('lpw').focus();});
+  $('loading').style.display='none';
+});
+</script>
+</body>
+</html>
