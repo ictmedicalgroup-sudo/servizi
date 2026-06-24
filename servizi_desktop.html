@@ -802,6 +802,7 @@ function renderStatistiche(pb){
       </div>
     </div>
     <div style="background:#fff;border:1px solid var(--g200);border-radius:var(--r);padding:20px;box-shadow:var(--sh-sm)">
+      <div id="stats-empty" class="empty-row hid">Nessun dato disponibile per i filtri selezionati</div>
       <canvas id="stats-chart" height="90"></canvas>
     </div>
   `;
@@ -842,11 +843,15 @@ function drawStatsChart(){
 
   if(_chartInstance){_chartInstance.destroy();_chartInstance=null;}
   const ctx=document.getElementById('stats-chart');
+  const emptyEl=document.getElementById('stats-empty');
   if(!ctx)return;
   if(!months.length){
-    ctx.parentElement.innerHTML='<div class="empty-row">Nessun dato disponibile per i filtri selezionati</div>';
+    ctx.classList.add('hid');
+    if(emptyEl)emptyEl.classList.remove('hid');
     return;
   }
+  ctx.classList.remove('hid');
+  if(emptyEl)emptyEl.classList.add('hid');
   _chartInstance=new Chart(ctx,{
     type:'line',
     data:{labels,datasets},
