@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Servizi — Raccolte</title>
+<title>Raccolte</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -36,6 +37,11 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 #tb-user{font-weight:600;color:var(--g700)}
 #tb-nav{height:40px;display:flex;align-items:stretch}
 .tnb{display:flex;align-items:center;gap:6px;padding:0 16px;font-size:12.5px;font-weight:600;color:var(--g500);cursor:pointer;border:none;background:none;font-family:'Raleway',sans-serif;letter-spacing:.3px;border-bottom:2.5px solid transparent;transition:all .17s;text-transform:uppercase}
+.tnb-drop{position:relative;display:flex}
+.tnb-menu{position:absolute;top:100%;left:0;background:#fff;border:1px solid var(--g200);border-radius:var(--rsm);box-shadow:var(--sh-lg);min-width:180px;z-index:300;padding:6px;margin-top:1px}
+.tnb-item{display:block;width:100%;text-align:left;padding:9px 12px;font-size:12.5px;font-weight:600;color:var(--g700);background:none;border:none;border-radius:var(--rsm);cursor:pointer;font-family:'Raleway',sans-serif;text-transform:none;letter-spacing:0}
+.tnb-item:hover{background:var(--g100)}
+.tnb-item.active{background:var(--blue-xlight);color:var(--verde)}
 .tnb:hover{color:var(--g700);border-bottom-color:var(--g300)}
 .tnb.active{color:var(--verde);border-bottom-color:var(--verde)}
 #main{flex:1;display:flex;flex-direction:column}
@@ -101,10 +107,10 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 .mt{font-size:15px;font-weight:700}.mbdy{padding:20px;overflow-y:auto;flex:1}.mf{padding:14px 20px;border-top:1px solid var(--g200);display:flex;gap:9px;justify-content:flex-end;flex-shrink:0}
 
 /* ── Toast ── */
-#toast{position:fixed;bottom:24px;right:24px;z-index:9999;padding:13px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:opacity .25s;max-width:380px}
+#toast{position:fixed;top:calc(16px + env(safe-area-inset-top));right:24px;z-index:9999;padding:13px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .25s;max-width:380px;background:#fff}
 #toast.show{opacity:1;pointer-events:auto}
-#toast.tok{background:var(--green-light);color:#1A7A40;border-left:3px solid var(--verde)}
-#toast.terr{background:var(--red-light);color:var(--red);border-left:3px solid var(--red)}
+#toast.tok{background:#EAF5DE;color:#1A7A40;border-left:3px solid var(--verde)}
+#toast.terr{background:#FBE2DE;color:var(--red);border-left:3px solid var(--red)}
 
 /* ── Dashboard / stat cards ── */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
@@ -187,6 +193,8 @@ const T=n=>`servizi_${n}`;
 const NAV_MAIN=[
   {id:'dashboard', l:'Dashboard', r:['admin','incaricato','referente']},
   {id:'raccolte',  l:'Raccolte',  r:['admin','incaricato','referente']},
+];
+const NAV_ADMIN=[
   {id:'referenti', l:'Sedi & referenti', r:['admin']},
   {id:'utenti',    l:'Utenti',    r:['admin']},
   {id:'log',       l:'Log',       r:['admin']},
@@ -308,11 +316,30 @@ function renderTopNav(){
   const rl={admin:'Admin',incaricato:'Incaricato',referente:'Referente'};
   $('tb-role').innerHTML=`<span class="bg ${rb[S.user.ruolo]||'bg-usr'}">${rl[S.user.ruolo]||S.user.ruolo}</span>`;
   const items=NAV_MAIN.filter(n=>n.r.includes(S.user.ruolo));
-  $('tb-nav').innerHTML=items.map(n=>`<button class="tnb" data-page="${n.id}" onclick="goPage('${n.id}')">${n.l}</button>`).join('');
+  const adminItems=NAV_ADMIN.filter(n=>n.r.includes(S.user.ruolo));
+  let html=items.map(n=>`<button class="tnb" data-page="${n.id}" onclick="goPage('${n.id}')">${n.l}</button>`).join('');
+  if(adminItems.length){
+    html+=`<div class="tnb-drop" id="admin-drop">
+      <button class="tnb" id="admin-trigger" onclick="toggleAdminDrop()">Admin ▾</button>
+      <div class="tnb-menu hid" id="admin-menu">
+        ${adminItems.map(n=>`<button class="tnb-item" data-page="${n.id}" onclick="goPage('${n.id}');closeAdminDrop()">${n.l}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+  $('tb-nav').innerHTML=html;
 }
+function toggleAdminDrop(){$('admin-menu').classList.toggle('hid');}
+function closeAdminDrop(){$('admin-menu').classList.add('hid');}
+document.addEventListener('click',e=>{
+  const d=$('admin-drop');
+  if(d&&!d.contains(e.target))closeAdminDrop();
+});
 function goPage(pg){
   S.page=pg;
-  document.querySelectorAll('.tnb').forEach(b=>b.classList.toggle('active',b.dataset.page===pg));
+  document.querySelectorAll('.tnb,.tnb-item').forEach(b=>b.classList.toggle('active',b.dataset.page===pg));
+  const adminPages=NAV_ADMIN.map(n=>n.id);
+  const trigger=$('admin-trigger');
+  if(trigger)trigger.classList.toggle('active',adminPages.includes(pg));
   renderPage();
 }
 function renderPage(){
@@ -325,7 +352,7 @@ function renderPage(){
   else if(S.page==='log'){loadLog().then(()=>renderLog(pb));}
 }
 function pg_guard(pg){
-  const item=NAV_MAIN.find(n=>n.id===pg);
+  const item=NAV_MAIN.find(n=>n.id===pg)||NAV_ADMIN.find(n=>n.id===pg);
   if(item&&!item.r.includes(S.user.ruolo)){$('pb').innerHTML='<div class="empty-row">Accesso non consentito.</div>';return true;}
   return false;
 }
@@ -355,13 +382,13 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
 // ══════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════
-function statoLbl(st){return{in_corso:'In corso',confermata:'Confermata',versata:'Versata',chiusa:'Chiusa',annullata:'Annullata'}[st]||st;}
-function statoBadge(st){const m={in_corso:'bg-amber',confermata:'bg-ref',versata:'bg-inc',chiusa:'bg-on',annullata:'bg-off'};return `<span class="bg ${m[st]||'bg-off'}">${statoLbl(st)}</span>`;}
+function statoLbl(st){return{in_corso:'In corso',ritirata:'Ritirata',versata:'Versata',annullata:'Annullata'}[st]||st;}
+function statoBadge(st){const m={in_corso:'bg-amber',ritirata:'bg-ref',versata:'bg-on',annullata:'bg-off'};return `<span class="bg ${m[st]||'bg-off'}">${statoLbl(st)}</span>`;}
 
 function renderDashboard(pb){
   const r=S.raccolte;
-  const inCorso=r.filter(x=>['in_corso','confermata','versata'].includes(x.stato));
-  const chiuse=r.filter(x=>x.stato==='chiusa');
+  const inCorso=r.filter(x=>['in_corso','ritirata'].includes(x.stato));
+  const chiuse=r.filter(x=>x.stato==='versata');
   const conDelta=r.filter(x=>x.delta!=null&&Number(x.delta)!==0);
   const totaleMese=r.filter(x=>{const d=new Date(x.created_at);const n=new Date();return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();}).reduce((s,x)=>s+Number(x.importo_dichiarato||0),0);
 
@@ -370,7 +397,7 @@ function renderDashboard(pb){
     <div class="stats-row">
       <div class="stat-card"><div class="stat-val">${r.length}</div><div class="stat-label">Raccolte totali</div></div>
       <div class="stat-card"><div class="stat-val amber">${inCorso.length}</div><div class="stat-label">Da completare</div></div>
-      <div class="stat-card"><div class="stat-val green">${chiuse.length}</div><div class="stat-label">Chiuse</div></div>
+      <div class="stat-card"><div class="stat-val green">${chiuse.length}</div><div class="stat-label">Versate</div></div>
       <div class="stat-card"><div class="stat-val ${conDelta.length?'red':''}">${conDelta.length}</div><div class="stat-label">Con delta</div></div>
       <div class="stat-card"><div class="stat-val">${eur(totaleMese)}</div><div class="stat-label">Raccolto questo mese</div></div>
     </div>
@@ -406,7 +433,7 @@ function renderRaccolte(pb){
       <div class="search-wrap"><input id="rac-search" placeholder="Cerca sede o persona..." value="${esc(f.search)}" oninput="onRacSearch(this.value)"></div>
     </div>
     <div class="filters">
-      ${['','in_corso','confermata','versata','chiusa','annullata'].map(s=>`<button class="filter-chip ${f.stato===s?'active':''}" onclick="setRacFiltro('${s}')">${s===''?'Tutte':statoLbl(s)}</button>`).join('')}
+      ${['','in_corso','ritirata','versata','annullata'].map(s=>`<button class="filter-chip ${f.stato===s?'active':''}" onclick="setRacFiltro('${s}')">${s===''?'Tutte':statoLbl(s)}</button>`).join('')}
     </div>
     <table class="dt"><thead><tr><th>Sede</th><th>Incaricato</th><th>Referente</th><th>Importo</th><th>Versato</th><th>Delta</th><th>Stato</th><th>Data</th><th></th></tr></thead>
     <tbody id="rac-tbody"></tbody></table>
@@ -462,26 +489,37 @@ function openRaccoltaDetail(id){
       <div class="fg"><div class="fl">Importo versato</div><div style="font-size:16px;font-weight:800">${eur(r.importo_versato)}</div></div>
     </div>
     ${r.delta!=null?`<div class="alert ${hasDelta?'aw':'ai'}" style="margin-bottom:14px">${hasDelta?`⚠ <b>Delta riscontrato: ${eur(r.delta)}</b> — l'importo versato non coincide con quello dichiarato in sede.`:'✓ Nessun delta: importo versato coincidente.'}</div>`:''}
-    <div class="fr">
-      <div class="fg"><div class="fl">Firma referente</div><div>${r.conf_referente_at?fmtDT(r.conf_referente_at):'—'} ${geoLink(r.firma_referente_lat,r.firma_referente_lng)}</div></div>
-      <div class="fg"><div class="fl">Firma incaricato</div><div>${r.conf_incaricato_at?fmtDT(r.conf_incaricato_at):'—'} ${geoLink(r.firma_incaricato_lat,r.firma_incaricato_lng)}</div></div>
-    </div>
-    <div class="fr">
-      <div class="fg"><div class="fl">Raccolta confermata</div><div>${r.chiusura_at?fmtDT(r.chiusura_at):'—'} ${geoLink(r.chiusura_lat,r.chiusura_lng)}</div></div>
-      <div class="fg"><div class="fl">Versamento</div><div>${r.versato_at?fmtDT(r.versato_at):'—'} ${geoLink(r.versato_lat,r.versato_lng)}</div></div>
-    </div>
+
+    <div class="fl" style="margin-bottom:8px">Firme</div>
     <div class="fr" style="margin-bottom:14px">
-      ${r.firma_referente_url?`<div><div class="fl" style="margin-bottom:6px">Firma referente</div><img src="${esc(r.firma_referente_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"></div>`:'<div></div>'}
-      ${r.firma_incaricato_url?`<div><div class="fl" style="margin-bottom:6px">Firma incaricato</div><img src="${esc(r.firma_incaricato_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"></div>`:'<div></div>'}
+      ${r.firma_referente_url?`<div><img src="${esc(r.firma_referente_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"><div style="font-size:11.5px;color:var(--g500);margin-top:4px">Referente · ${r.conf_referente_at?fmtDT(r.conf_referente_at):'—'} ${geoLink(r.firma_referente_lat,r.firma_referente_lng)}</div></div>`:'<div></div>'}
+      ${r.firma_incaricato_url?`<div><img src="${esc(r.firma_incaricato_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"><div style="font-size:11.5px;color:var(--g500);margin-top:4px">Incaricato · ${r.conf_incaricato_at?fmtDT(r.conf_incaricato_at):'—'} ${geoLink(r.firma_incaricato_lat,r.firma_incaricato_lng)}</div></div>`:'<div></div>'}
     </div>
-    ${r.ricevuta_url?`<div class="fg"><div class="fl">Ricevuta di versamento</div><img src="${esc(r.ricevuta_url)}" class="thumb" style="width:100%;max-width:320px;height:auto" onclick="window.open('${esc(r.ricevuta_url)}','_blank')"></div>`:''}
+
+    <div class="fg"><div class="fl">Raccolta ritirata</div><div>${r.chiusura_at?fmtDT(r.chiusura_at):'—'} ${geoLink(r.chiusura_lat,r.chiusura_lng)}</div></div>
+
+    <div class="fl" style="margin-bottom:8px;margin-top:14px">Versamento</div>
+    <div class="fg"><div>${r.versato_at?fmtDT(r.versato_at):'—'} ${geoLink(r.versato_lat,r.versato_lng)}</div></div>
+    ${r.ricevuta_url?`<div class="fg"><img src="${esc(r.ricevuta_url)}" class="thumb" style="width:100%;max-width:320px;height:auto" onclick="window.open('${esc(r.ricevuta_url)}','_blank')"></div>`:''}
+
     <div class="fg"><div class="fl">Creata il</div><div>${fmtDT(r.created_at)}</div></div>
-    ${r.note?`<div class="fg"><div class="fl">Note</div><div>${esc(r.note)}</div></div>`:''}
+    <div class="fg"><div class="fl">Note</div><textarea class="fta" id="rac-note" placeholder="Nessuna nota">${esc(r.note||'')}</textarea></div>
   `;
-  const btns=[{l:'Chiudi',c:'bs',a:closeM}];
+  const btns=[
+    {l:'Chiudi',c:'bs',a:closeM},
+    {l:'Salva note',c:'bpg',a:async()=>{
+      try{
+        const note=$('rac-note').value.trim();
+        await db('PATCH',T('raccolte'),{flt:`id=eq.${r.id}`,body:{note:note||null}});
+        r.note=note;
+        S.raccolte=S.raccolte.map(x=>x.id===r.id?{...x,note}:x);
+        toast('Note salvate ✓');closeM();
+      }catch(e){toast(e.message,'terr');}
+    }},
+  ];
   if(S.user.ruolo==='admin'&&r.stato!=='annullata'){
-    btns.unshift({l:'Annulla raccolta',c:'bd',a:async()=>{
-      openConf('Annullare questa raccolta? L\'operazione non elimina i dati ma la marca come annullata.',async()=>{
+    btns.unshift({l:'Annulla raccolta',c:'bd',a:()=>{
+      openConf("Annullare questa raccolta? L'operazione non elimina i dati ma la marca come annullata.",async()=>{
         await db('PATCH',T('raccolte'),{flt:`id=eq.${r.id}`,body:{stato:'annullata'}});
         await writeLog('raccolta_annullata',`Sede ${sede?.nome} · ${eur(r.importo_dichiarato)}`);
         S.raccolte=await db('GET',T('raccolte'),{ord:'created_at.desc',lim:'500'})||[];
