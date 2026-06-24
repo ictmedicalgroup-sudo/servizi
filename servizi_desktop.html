@@ -502,7 +502,6 @@ function openRaccoltaDetail(id){
     <div class="fg"><div>${r.versato_at?fmtDT(r.versato_at):'—'} ${geoLink(r.versato_lat,r.versato_lng)}</div></div>
     ${r.ricevuta_url?`<div class="fg"><img src="${esc(r.ricevuta_url)}" class="thumb" style="width:100%;max-width:320px;height:auto" onclick="window.open('${esc(r.ricevuta_url)}','_blank')"></div>`:''}
 
-    <div class="fg"><div class="fl">Creata il</div><div>${fmtDT(r.created_at)}</div></div>
     <div class="fg"><div class="fl">Note</div><textarea class="fta" id="rac-note" placeholder="Nessuna nota">${esc(r.note||'')}</textarea></div>
   `;
   const btns=[
@@ -527,7 +526,10 @@ function openRaccoltaDetail(id){
       });
     }});
   }
-  openM(`Raccolta — ${sede?.nome||''}`,body,btns,true);
+  const dt=new Date(r.created_at);
+  const dataStr=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const oraStr=dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  openM(`${esc(sede?.nome||'')}: raccolta creata il ${dataStr} alle ${oraStr}`,body,btns,true);
 }
 
 // ══════════════════════════════════════════
