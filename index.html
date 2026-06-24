@@ -334,6 +334,9 @@ async function supaLogin(email,pwd){
   return data;
 }
 // Upload su Supabase Storage → ritorna l'URL pubblico
+// Upload su Supabase Storage → ritorna il PATH (non l'URL pubblico, perché
+// i bucket sono privati). Il path va salvato nel DB; per visualizzare
+// l'immagine si genera un URL firmato al momento (vedi getSignedUrl).
 async function uploadToStorage(bucket,path,blob,contentType){
   const res=await fetch(`${CFG.URL}/storage/v1/object/${bucket}/${path}`,{
     method:'POST',
@@ -341,7 +344,36 @@ async function uploadToStorage(bucket,path,blob,contentType){
     body:blob,
   });
   if(!res.ok){const e=await res.text();throw new Error(`Upload ${bucket}: ${e}`);}
-  return `${CFG.URL}/storage/v1/object/public/${bucket}/${path}`;
+  return path; // salviamo solo il path nel DB, non l'URL
+}
+// Genera un URL firmato temporaneo (valido 1h) per un file in un bucket privato.
+// path: il valore già salvato in DB (es. "raccoltaId/ref_169123.png").
+const _signedUrlCache={};
+async function getSignedUrl(bucket,path){
+  if(!path)return null;
+  const cacheKey=`${bucket}/${path}`;
+  const cached=_signedUrlCache[cacheKey];
+  if(cached&&cached.exp>Date.now())return cached.url;
+  const res=await fetch(`${CFG.URL}/storage/v1/object/sign/${bucket}/${path}`,{
+    method:'POST',
+    headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token||CFG.KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify({expiresIn:3600}),
+  });
+  if(!res.ok)return null;
+  const data=await res.json();
+  const url=`${CFG.URL}/storage/v1${data.signedURL}`;
+  _signedUrlCache[cacheKey]={url,exp:Date.now()+55*60*1000};
+  return url;
+}
+// Sostituisce ogni <img data-sb-bucket data-sb-path> nel DOM con l'URL firmato.
+// Va richiamato dopo ogni render che inserisce immagini da storage privato.
+async function hydrateSignedImages(root){
+  const imgs=(root||document).querySelectorAll('img[data-sb-bucket]');
+  await Promise.all([...imgs].map(async img=>{
+    const url=await getSignedUrl(img.dataset.sbBucket,img.dataset.sbPath);
+    if(url)img.src=url;
+    else img.replaceWith(Object.assign(document.createElement('div'),{className:'empty',textContent:'Immagine non disponibile'}));
+  }));
 }
 function dataURLtoBlob(dataURL){
   const[meta,b64]=dataURL.split(',');
@@ -760,8 +792,8 @@ function renderStepRiepilogo(readonly){
     </div>
 
     <div style="display:flex;gap:10px;margin-bottom:8px">
-      ${r.firma_referente_url?`<img src="${esc(r.firma_referente_url)}" style="flex:1;height:70px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
-      ${r.firma_incaricato_url?`<img src="${esc(r.firma_incaricato_url)}" style="flex:1;height:70px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+      ${r.firma_referente_url?`<img data-sb-bucket="servizi-firme" data-sb-path="${esc(r.firma_referente_url)}" style="flex:1;height:70px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+      ${r.firma_incaricato_url?`<img data-sb-bucket="servizi-firme" data-sb-path="${esc(r.firma_incaricato_url)}" style="flex:1;height:70px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
     </div>
 
     <div class="bottom-bar">
@@ -770,6 +802,7 @@ function renderStepRiepilogo(readonly){
         : `<button class="btn btn-primary" id="riep-termina" onclick="terminaRaccolta()">Termina</button>`}
     </div>
   `;
+  hydrateSignedImages($('v-flow'));
 }
 async function terminaRaccolta(){
   const f=S.flow;
@@ -811,7 +844,7 @@ function renderStepVersamento(readonly){
       <div class="rec-row"><span class="k">Versato il</span><span class="v">${fmtDT(r.versato_at)}</span></div>
       <div class="rec-row"><span class="k">Stato</span><span class="v">${statoTag(r.stato)}</span></div>
     </div>
-    ${r.ricevuta_url?`<img src="${esc(r.ricevuta_url)}" class="ricevuta-preview">`:''}
+    ${r.ricevuta_url?`<img data-sb-bucket="servizi-ricevute" data-sb-path="${esc(r.ricevuta_url)}" class="ricevuta-preview">`:''}
     <div class="bottom-bar"><button class="btn btn-ghost" onclick="goView('storico')">Torna allo storico</button></div>
     `:`
     <div class="fg">
@@ -827,7 +860,7 @@ function renderStepVersamento(readonly){
     <label class="fg" style="display:block"><span style="display:block;font-size:11px;font-weight:700;color:var(--g700);letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase">Ricevuta di versamento</span></label>
     <div id="ricevuta-zone">
       ${f.ricevutaUrl
-        ?`<img src="${esc(f.ricevutaUrl)}" class="ricevuta-preview"><button class="btn btn-ghost" onclick="document.getElementById('ric-file').click()">Sostituisci foto</button>`
+        ?`<img data-sb-bucket="servizi-ricevute" data-sb-path="${esc(f.ricevutaUrl)}" class="ricevuta-preview"><button class="btn btn-ghost" onclick="document.getElementById('ric-file').click()">Sostituisci foto</button>`
         :`<div class="upload-box" onclick="document.getElementById('ric-file').click()"><div class="ico">📷</div><div class="txt">Fotografa o carica la ricevuta</div><div class="sub">JPG o PNG</div></div>`}
     </div>
     <input type="file" id="ric-file" accept="image/*" capture="environment" style="display:none" onchange="onRicevutaPick(this)">
@@ -837,6 +870,7 @@ function renderStepVersamento(readonly){
     </div>
     `}
   `;
+  hydrateSignedImages($('v-flow'));
 }
 // Mostra il riepilogo (importo+firme) in sola lettura, richiamabile dallo step versamento
 function renderRiepilogoPrecedente(){
@@ -855,25 +889,27 @@ function renderRiepilogoPrecedente(){
       <div class="rec-row"><span class="k">Firma incaricato</span><span class="v ok">${r.conf_incaricato_at?'✓ '+fmtDT(r.conf_incaricato_at):'—'}</span></div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:8px">
-      ${r.firma_referente_url?`<img src="${esc(r.firma_referente_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
-      ${r.firma_incaricato_url?`<img src="${esc(r.firma_incaricato_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+      ${r.firma_referente_url?`<img data-sb-bucket="servizi-firme" data-sb-path="${esc(r.firma_referente_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+      ${r.firma_incaricato_url?`<img data-sb-bucket="servizi-firme" data-sb-path="${esc(r.firma_incaricato_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
     </div>
     <div class="bottom-bar"><button class="btn btn-ghost" onclick="renderStepVersamento(${['versata','annullata'].includes(r.stato)})">‹ Torna al versamento</button></div>
   `;
+  hydrateSignedImages($('v-flow'));
 }
 function onImportoInput2(el){onImportoInput(el);}
 
 async function onRicevutaPick(input){
   const file=input.files&&input.files[0];if(!file)return;
   const f=S.flow;
+  const localPreview=URL.createObjectURL(file);
   const zone=$('ricevuta-zone');zone.innerHTML=`<div class="upload-box"><span class="spn" style="border-color:var(--g200);border-top-color:var(--verde)"></span><div class="txt" style="margin-top:8px">Caricamento…</div></div>`;
   try{
     const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
     const path=`${f.raccoltaId}/ricevuta_${Date.now()}.${ext}`;
-    const url=await uploadToStorage(BUCKET_RICEVUTE,path,file,file.type||'image/jpeg');
-    f.ricevutaUrl=url;
-    await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{ricevuta_url:url}});
-    zone.innerHTML=`<img src="${esc(url)}" class="ricevuta-preview"><button class="btn btn-ghost" onclick="document.getElementById('ric-file').click()">Sostituisci foto</button>`;
+    const savedPath=await uploadToStorage(BUCKET_RICEVUTE,path,file,file.type||'image/jpeg');
+    f.ricevutaUrl=savedPath;
+    await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{ricevuta_url:savedPath}});
+    zone.innerHTML=`<img src="${esc(localPreview)}" class="ricevuta-preview"><button class="btn btn-ghost" onclick="document.getElementById('ric-file').click()">Sostituisci foto</button>`;
     toast('Ricevuta caricata ✓','ok');
   }catch(e){toast(e.message,'terr');zone.innerHTML=`<div class="upload-box" onclick="document.getElementById('ric-file').click()"><div class="ico">📷</div><div class="txt">Riprova</div></div>`;}
 }
