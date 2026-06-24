@@ -6,7 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#fff">
-<title>Raccolte — Medical Group</title>
+<title>Raccolte</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,13 +47,13 @@ input,select,textarea{font-size:16px!important;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 /* TOAST */
-#toast{position:fixed;top:calc(12px + env(safe-area-inset-top));right:16px;left:16px;z-index:9999;padding:14px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:opacity .25s;max-width:480px;margin:0 auto;display:flex;align-items:center;gap:10px;justify-content:space-between;}
+#toast{position:fixed;top:calc(12px + env(safe-area-inset-top));right:16px;left:16px;z-index:9999;padding:14px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:opacity .25s;max-width:480px;margin:0 auto;display:flex;align-items:center;gap:10px;justify-content:space-between;background:#fff;}
 #toast.show{pointer-events:auto;opacity:1;}
 #toast .toast-msg{flex:1;word-break:break-word;}
 #toast .toast-copy{flex-shrink:0;background:rgba(0,0,0,.12);border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;color:inherit;font-family:'Raleway',sans-serif;}
-#toast.tok{background:var(--green-light);color:#2d6a2d;border-left:3px solid var(--verde);}
-#toast.terr{background:var(--red-light);color:var(--red);border-left:3px solid var(--red);}
-#toast.tinfo{background:var(--blue-xlight);color:var(--navy);border-left:3px solid var(--verde);}
+#toast.tok{background:#EAF5DE;color:#2d6a2d;border-left:3px solid var(--verde);}
+#toast.terr{background:#FBE2DE;color:var(--red);border-left:3px solid var(--red);}
+#toast.tinfo{background:#E3EEFB;color:var(--navy);border-left:3px solid var(--verde);}
 
 /* LOADING */
 #loading{position:fixed;inset:0;background:var(--g50);z-index:10000;display:flex;align-items:center;justify-content:center;}
@@ -130,10 +131,9 @@ input,select,textarea{font-size:16px!important;}
 
 /* TAG / BADGE */
 .tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
-.tag-incorso{background:var(--amber-light);color:var(--amber);}
-.tag-confermata{background:var(--blue-xlight);color:var(--verde);}
-.tag-versata{background:#E8F0FB;color:#3B7DD8;}
-.tag-chiusa{background:var(--green-light);color:#2d6a2d;}
+.tag-in_corso{background:var(--amber-light);color:var(--amber);}
+.tag-ritirata{background:var(--blue-xlight);color:var(--verde);}
+.tag-versata{background:var(--green-light);color:#2d6a2d;}
 .tag-annullata{background:var(--g100);color:var(--g500);}
 .tag-delta{background:var(--red-light);color:var(--red);}
 
@@ -465,7 +465,7 @@ function goView(v){
 // HOME
 // ══════════════════════════════════════════
 function renderHome(){
-  const aperte=S.raccolte.filter(r=>['in_corso','confermata','versata'].includes(r.stato));
+  const aperte=S.raccolte.filter(r=>['in_corso','ritirata'].includes(r.stato));
   const conDelta=S.raccolte.filter(r=>r.delta!=null&&Number(r.delta)!==0);
   $('v-home').innerHTML=`
     <div class="ph"><div><h1>Ciao, ${esc(S.user.nome)}</h1><div class="sub">Cosa vuoi fare?</div></div></div>
@@ -522,7 +522,7 @@ function rRowHTML(r){
     <div class="card-arrow">›</div>
   </div></div>`;
 }
-function statoTag(st){const lbl={in_corso:'In corso',confermata:'Confermata',versata:'Versata',chiusa:'Chiusa',annullata:'Annullata'}[st]||st;return `<span class="tag tag-${st}">${lbl}</span>`;}
+function statoTag(st){const lbl={in_corso:'In corso',ritirata:'Ritirata',versata:'Versata',annullata:'Annullata'}[st]||st;return `<span class="tag tag-${st}">${lbl}</span>`;}
 
 // ══════════════════════════════════════════
 // FLOW — le 4 fasi
@@ -547,16 +547,20 @@ function openRaccolta(id){
     ricevutaUrl:r.ricevuta_url||null,
   };
   goView('flow');
-  if(r.stato==='confermata'){renderStepVersamento();}
-  else if(['versata','chiusa','annullata'].includes(r.stato)){renderStepVersamento(true);}
+  if(r.stato==='ritirata'){renderStepVersamento();}
+  else if(['versata','annullata'].includes(r.stato)){renderStepVersamento(true);}
   else if(r.confRef&&r.confInc){renderStepFirme();}
   else {renderStepImporto();}
 }
 
-function stepsHTML(cur){
+function stepsHTML(cur,completato){
   const order=['importo','firme','riepilogo','versamento'];
   const ci=order.indexOf(cur);
-  return `<div class="steps">${order.map((s,i)=>`<div class="step ${i<ci?'done':i===ci?'cur':''}"></div>`).join('')}</div>`;
+  return `<div class="steps">${order.map((s,i)=>{
+    const done=i<ci||(i===ci&&completato);
+    const isCur=i===ci&&!completato;
+    return `<div class="step ${done?'done':isCur?'cur':''}"></div>`;
+  }).join('')}</div>`;
 }
 
 // ── FASE 2.2 — inserimento importo + scelta referente ──────────────────
@@ -565,7 +569,7 @@ function renderStepImporto(){
   const refs=referentiDiSede(f.sedeId);
   const locked=!!(f.confRef||f.confInc); // almeno una firma già apposta → blocco modifiche
   $('v-flow').innerHTML=`
-    <div class="ph"><button class="back" onclick="abortFlow()">‹</button><div><h1>${esc(sede?.nome||'Sede')}</h1><div class="sub">${sede?.indirizzo?esc(sede.indirizzo)+' · ':''}Nuova raccolta</div></div></div>
+    <div class="ph"><button class="back" onclick="abortFlow()">‹</button><div><h1>${esc(sede?.nome||'Sede')}</h1><div class="sub">${sede?.indirizzo?esc(sede.indirizzo):''}</div></div></div>
     ${stepsHTML('importo')}
 
     ${locked?`<div class="rec-card" style="background:var(--amber-light);border-color:#f0d98a;margin-bottom:14px"><div style="padding:10px 0;font-size:12.5px;color:#7a5400">🔒 Importo e referente non sono più modificabili: è già stata registrata almeno una firma.</div></div>`:''}
@@ -590,7 +594,9 @@ function renderStepImporto(){
 
     ${locked?'':`<div class="rec-card" style="background:var(--blue-xlight);border-color:var(--blue-light)">
       <div style="padding:10px 0;font-size:12.5px;color:var(--navy);line-height:1.5">
-        <strong>Promemoria:</strong> il denaro è stato contato due volte (referente + incaricato) prima di inserirlo qui. Non va riposto in buste prima dell'accordo sulla cifra.
+        <strong>PROMEMORIA</strong><br>
+        Il denaro deve essere stato contato due volte (referente di sede + incaricato al ritiro) prima che la cifra venga inserita qui sopra.<br><br>
+        Il denaro non deve essere inserito in busta prima che referente di sede ed incaricato al ritiro abbiano verificato e concordato il numero da inserire.
       </div>
     </div>`}
 
@@ -737,7 +743,7 @@ function renderStepRiepilogo(readonly){
   const f=S.flow;
   const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
   const sede=sedeById(f.sedeId),ref=profById(f.referenteId),inc=S.user;
-  const giaChiusa=['confermata','versata','chiusa'].includes(r.stato);
+  const giaChiusa=['ritirata','versata','annullata'].includes(r.stato);
   $('v-flow').innerHTML=`
     <div class="ph"><button class="back" onclick="${readonly?"goView('storico')":"renderStepFirme()"}">‹</button><div><h1>Riepilogo</h1><div class="sub">${esc(sede?.nome||'')}</div></div></div>
     ${stepsHTML('riepilogo')}
@@ -771,12 +777,12 @@ async function terminaRaccolta(){
   try{
     const geo=await getGeo();
     await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{
-      stato:'confermata',chiusura_at:new Date().toISOString(),
+      stato:'ritirata',chiusura_at:new Date().toISOString(),
       chiusura_lat:geo?.lat??null,chiusura_lng:geo?.lng??null,
     }});
     await writeLog('raccolta_confermata',`Sede ${sedeById(f.sedeId)?.nome} · ${eur(parseImporto(f.importo))}`);
     await reloadRaccolte();
-    toast('Raccolta confermata ✓ — il versamento si fa più tardi','ok');
+    toast('Raccolta ritirata ✓ — il versamento si fa più tardi','ok');
     S.flow=null;
     goView('home');
   }catch(e){toast(e.message,'terr');btn.innerHTML='Termina';btn.disabled=false;}
@@ -790,7 +796,7 @@ function renderStepVersamento(readonly){
   const hasDelta=r.delta!=null&&Number(r.delta)!==0;
   $('v-flow').innerHTML=`
     <div class="ph"><button class="back" onclick="goView('storico')">‹</button><div><h1>Versamento</h1><div class="sub">Banca o cash-in sede centrale</div></div></div>
-    ${stepsHTML('versamento')}
+    ${stepsHTML('versamento',!!readonly)}
 
     <button class="btn btn-ghost" style="margin-bottom:14px" onclick="renderRiepilogoPrecedente()">👁 Vedi riepilogo e firme (sola lettura)</button>
 
@@ -838,7 +844,7 @@ function renderRiepilogoPrecedente(){
   const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
   const sede=sedeById(f.sedeId),ref=profById(f.referenteId),inc=profById(r.incaricato_id);
   $('v-flow').innerHTML=`
-    <div class="ph"><button class="back" onclick="renderStepVersamento(${['versata','chiusa','annullata'].includes(r.stato)})">‹</button><div><h1>Riepilogo raccolta</h1><div class="sub">${esc(sede?.nome||'')} · sola lettura</div></div></div>
+    <div class="ph"><button class="back" onclick="renderStepVersamento(${['versata','annullata'].includes(r.stato)})">‹</button><div><h1>Riepilogo raccolta</h1><div class="sub">${esc(sede?.nome||'')} · sola lettura</div></div></div>
 
     <div class="importo-display"><div class="lbl">Totale concordato</div><div class="val">${eur(r.importo_dichiarato)}</div></div>
 
@@ -852,7 +858,7 @@ function renderRiepilogoPrecedente(){
       ${r.firma_referente_url?`<img src="${esc(r.firma_referente_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
       ${r.firma_incaricato_url?`<img src="${esc(r.firma_incaricato_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
     </div>
-    <div class="bottom-bar"><button class="btn btn-ghost" onclick="renderStepVersamento(${['versata','chiusa','annullata'].includes(r.stato)})">‹ Torna al versamento</button></div>
+    <div class="bottom-bar"><button class="btn btn-ghost" onclick="renderStepVersamento(${['versata','annullata'].includes(r.stato)})">‹ Torna al versamento</button></div>
   `;
 }
 function onImportoInput2(el){onImportoInput(el);}
@@ -883,7 +889,7 @@ async function chiudiCiclo(){
   try{
     const geo=await getGeo();
     await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{
-      importo_versato:versato,delta,versato_at:new Date().toISOString(),stato:'chiusa',
+      importo_versato:versato,delta,versato_at:new Date().toISOString(),stato:'versata',
       versato_lat:geo?.lat??null,versato_lng:geo?.lng??null,
     }});
     await writeLog('raccolta_chiusa',`${eur(r.importo_dichiarato)} → versato ${eur(versato)} · delta ${eur(delta)}`);
@@ -909,7 +915,7 @@ function renderStorico(){
     <div class="ph"><button class="back" onclick="goView('home')">‹</button><div><h1>Le mie raccolte</h1><div class="sub">${S.raccolte.length} totali</div></div></div>
     <div class="search-wrap"><input id="stor-search" placeholder="Cerca per sede..." oninput="renderStoricoList()"></div>
     <div style="display:flex;gap:7px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px">
-      ${['tutte','in_corso','confermata','versata','chiusa'].map(s=>`<button onclick="setStorFilter('${s}')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid ${_storFilter===s?'var(--verde)':'var(--g200)'};background:${_storFilter===s?'var(--blue-xlight)':'#fff'};color:${_storFilter===s?'var(--verde)':'var(--g500)'}">${{tutte:'Tutte',in_corso:'In corso',confermata:'Confermate',versata:'Versate',chiusa:'Chiuse'}[s]}</button>`).join('')}
+      ${['tutte','in_corso','ritirata','versata','annullata'].map(s=>`<button onclick="setStorFilter('${s}')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid ${_storFilter===s?'var(--verde)':'var(--g200)'};background:${_storFilter===s?'var(--blue-xlight)':'#fff'};color:${_storFilter===s?'var(--verde)':'var(--g500)'}">${{tutte:'Tutte',in_corso:'In corso',ritirata:'Ritirate',versata:'Versate',annullata:'Annullate'}[s]}</button>`).join('')}
     </div>
     <div id="stor-list"></div>
   `;
