@@ -207,6 +207,10 @@ function fmt(d){if(!d)return'—';const dt=typeof d==='string'?new Date(d.length
 function fmtDT(d){if(!d)return'—';const dt=new Date(d);return dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});}
 function eur(n){if(n==null||n==='')return'—';return Number(n).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';}
 function fullName(p){return p?`${p.nome||''} ${p.cognome||''}`.trim():'—';}
+function geoLink(lat,lng){
+  if(lat==null||lng==null)return '';
+  return `<a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" style="font-size:11px;color:var(--verde);font-weight:700;margin-left:6px">📍 mappa</a>`;
+}
 function profById(id){return S.profili.find(p=>p.id===id);}
 function sedeById(id){return S.sedi.find(s=>s.id===id);}
 
@@ -275,13 +279,15 @@ function doLogout(){
 // LOAD
 // ══════════════════════════════════════════
 async function loadAll(){
-  const[profili,sedi,sr,raccolte]=await Promise.all([
+  const[profili,sedi,sr,raccolte,config]=await Promise.all([
     db('GET',T('profili'),{ord:'cognome.asc,nome.asc'}),
     db('GET','sedi_sedi',{ord:'nome.asc'}), // tabella del tool "Gestione Sedi"
     db('GET',T('sede_referenti')),
     db('GET',T('raccolte'),{ord:'created_at.desc',lim:'500'}),
+    db('GET',T('config'),{flt:'id=eq.true'}),
   ]);
   S.profili=profili||[];S.sedi=sedi||[];S.sedeReferenti=sr||[];S.raccolte=raccolte||[];
+  S.config=config?.[0]||{geo_enabled:true};
 }
 async function loadLog(){S.log=await db('GET',T('log'),{ord:'created_at.desc',lim:'300'})||[];}
 function referentiDiSede(sedeId){
@@ -457,8 +463,12 @@ function openRaccoltaDetail(id){
     </div>
     ${r.delta!=null?`<div class="alert ${hasDelta?'aw':'ai'}" style="margin-bottom:14px">${hasDelta?`⚠ <b>Delta riscontrato: ${eur(r.delta)}</b> — l'importo versato non coincide con quello dichiarato in sede.`:'✓ Nessun delta: importo versato coincidente.'}</div>`:''}
     <div class="fr">
-      <div class="fg"><div class="fl">Firma referente</div><div>${r.conf_referente_at?fmtDT(r.conf_referente_at):'—'}</div></div>
-      <div class="fg"><div class="fl">Firma incaricato</div><div>${r.conf_incaricato_at?fmtDT(r.conf_incaricato_at):'—'}</div></div>
+      <div class="fg"><div class="fl">Firma referente</div><div>${r.conf_referente_at?fmtDT(r.conf_referente_at):'—'} ${geoLink(r.firma_referente_lat,r.firma_referente_lng)}</div></div>
+      <div class="fg"><div class="fl">Firma incaricato</div><div>${r.conf_incaricato_at?fmtDT(r.conf_incaricato_at):'—'} ${geoLink(r.firma_incaricato_lat,r.firma_incaricato_lng)}</div></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Raccolta confermata</div><div>${r.chiusura_at?fmtDT(r.chiusura_at):'—'} ${geoLink(r.chiusura_lat,r.chiusura_lng)}</div></div>
+      <div class="fg"><div class="fl">Versamento</div><div>${r.versato_at?fmtDT(r.versato_at):'—'} ${geoLink(r.versato_lat,r.versato_lng)}</div></div>
     </div>
     <div class="fr" style="margin-bottom:14px">
       ${r.firma_referente_url?`<div><div class="fl" style="margin-bottom:6px">Firma referente</div><img src="${esc(r.firma_referente_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"></div>`:'<div></div>'}
@@ -582,15 +592,41 @@ const RBADGE={admin:['bg-adm','Admin'],incaricato:['bg-inc','Incaricato'],refere
 function renderUtenti(pb){
   pb.innerHTML=`
     <div class="page-hdr"><h1>Utenti</h1><button class="btn bpg" onclick="openUtenteModal(null)">+ Nuovo utente</button></div>
-    <table class="dt"><thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th><th></th></tr></thead><tbody>
-      ${S.profili.map(u=>{const[rc,rl]=RBADGE[u.ruolo]||['bg-usr',u.ruolo];return `<tr>
+    <div style="background:#fff;border:1px solid var(--g200);border-radius:var(--r);padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-weight:700;font-size:13.5px;color:var(--navy)">Geolocalizzazione eventi</div>
+      <div style="font-size:12px;color:var(--g500);margin-top:2px">Se attiva, il telefono registra le coordinate di ogni firma, chiusura raccolta e versamento (previo consenso del singolo utente)</div></div>
+      <label class="tw"><div class="tg"><input type="checkbox" id="geo-toggle" ${S.config?.geo_enabled!==false?'checked':''} onchange="toggleGeoConfig(this.checked)"><span class="tsl"></span></div></label>
+    </div>
+    <table class="dt"><thead><tr><th>Nome</th><th>Email</th><th>Ruolo</th><th>Stato</th><th>Geolocalizzazione</th><th></th></tr></thead><tbody>
+      ${S.profili.map(u=>{const[rc,rl]=RBADGE[u.ruolo]||['bg-usr',u.ruolo];
+        const geo=u.geo_consenso===false
+          ?`<span class="bg bg-red">⚠ Negata</span> <button class="btn bs" style="padding:3px 8px;font-size:11px" onclick="resetGeoConsenso('${u.id}')">Resetta</button>`
+          :u.geo_consenso===true?'<span class="bg bg-on">● Concessa</span>'
+          :'<span class="bg bg-off">— Non richiesta</span>';
+        return `<tr>
         <td>${esc(fullName(u))}</td><td>${esc(u.email)}</td>
         <td><span class="bg ${rc}">${rl}</span></td>
         <td><span class="bg ${u.attivo!==false?'bg-on':'bg-off'}">${u.attivo!==false?'● Attivo':'○ Inattivo'}</span></td>
+        <td>${geo}</td>
         <td><button class="btn bs" onclick="openUtenteModal('${u.id}')">Modifica</button></td>
-      </tr>`;}).join('')||'<tr><td colspan="5" class="empty-row">Nessun utente</td></tr>'}
+      </tr>`;}).join('')||'<tr><td colspan="6" class="empty-row">Nessun utente</td></tr>'}
     </tbody></table>
   `;
+}
+async function toggleGeoConfig(enabled){
+  try{
+    await db('PATCH',T('config'),{flt:'id=eq.true',body:{geo_enabled:enabled}});
+    S.config={...(S.config||{}),geo_enabled:enabled};
+    toast(enabled?'Geolocalizzazione attivata ✓':'Geolocalizzazione disattivata ✓');
+  }catch(e){toast(e.message,'terr');$('geo-toggle').checked=!enabled;}
+}
+async function resetGeoConsenso(userId){
+  try{
+    await db('PATCH',T('profili'),{flt:`id=eq.${userId}`,body:{geo_consenso:null}});
+    S.profili=S.profili.map(p=>p.id===userId?{...p,geo_consenso:null}:p);
+    renderPage();
+    toast('Consenso resettato — verrà richiesto di nuovo al prossimo evento ✓');
+  }catch(e){toast(e.message,'terr');}
 }
 function openUtenteModal(uid_val){
   const u=uid_val?S.profili.find(p=>p.id===uid_val):null;
