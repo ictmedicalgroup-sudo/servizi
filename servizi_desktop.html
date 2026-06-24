@@ -259,6 +259,40 @@ async function writeLog(azione,dettaglio){
 }
 
 // ══════════════════════════════════════════
+// STORAGE — bucket privati: serve un URL firmato per ogni visualizzazione
+// ══════════════════════════════════════════
+const _signedUrlCache={};
+async function getSignedUrl(bucket,path){
+  if(!path)return null;
+  const cacheKey=`${bucket}/${path}`;
+  const cached=_signedUrlCache[cacheKey];
+  if(cached&&cached.exp>Date.now())return cached.url;
+  const res=await fetch(`${CFG.URL}/storage/v1/object/sign/${bucket}/${path}`,{
+    method:'POST',
+    headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token||CFG.KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify({expiresIn:3600}),
+  });
+  if(!res.ok)return null;
+  const data=await res.json();
+  const url=`${CFG.URL}/storage/v1${data.signedURL}`;
+  _signedUrlCache[cacheKey]={url,exp:Date.now()+55*60*1000};
+  return url;
+}
+async function hydrateSignedImages(root){
+  const imgs=(root||document).querySelectorAll('img[data-sb-bucket]');
+  await Promise.all([...imgs].map(async img=>{
+    const url=await getSignedUrl(img.dataset.sbBucket,img.dataset.sbPath);
+    if(url){img.src=url;img.dataset.signedUrl=url;}
+    else img.replaceWith(Object.assign(document.createElement('div'),{className:'empty-row',textContent:'Immagine non disponibile'}));
+  }));
+}
+async function openSignedImage(bucket,path){
+  const url=await getSignedUrl(bucket,path);
+  if(url)window.open(url,'_blank');
+  else toast('Impossibile generare il link all\'immagine','terr');
+}
+
+// ══════════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════════
 async function doLogin(){
@@ -497,15 +531,15 @@ function openRaccoltaDetail(id){
 
     <div class="fl" style="margin-bottom:8px">Firme</div>
     <div class="fr" style="margin-bottom:14px">
-      ${r.firma_referente_url?`<div><img src="${esc(r.firma_referente_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"><div style="font-size:11.5px;color:var(--g500);margin-top:4px">Referente · ${r.conf_referente_at?fmtDT(r.conf_referente_at):'—'} ${geoLink(r.firma_referente_lat,r.firma_referente_lng)}</div></div>`:'<div></div>'}
-      ${r.firma_incaricato_url?`<div><img src="${esc(r.firma_incaricato_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"><div style="font-size:11.5px;color:var(--g500);margin-top:4px">Incaricato · ${r.conf_incaricato_at?fmtDT(r.conf_incaricato_at):'—'} ${geoLink(r.firma_incaricato_lat,r.firma_incaricato_lng)}</div></div>`:'<div></div>'}
+      ${r.firma_referente_url?`<div><img data-sb-bucket="servizi-firme" data-sb-path="${esc(r.firma_referente_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"><div style="font-size:11.5px;color:var(--g500);margin-top:4px">Referente · ${r.conf_referente_at?fmtDT(r.conf_referente_at):'—'} ${geoLink(r.firma_referente_lat,r.firma_referente_lng)}</div></div>`:'<div></div>'}
+      ${r.firma_incaricato_url?`<div><img data-sb-bucket="servizi-firme" data-sb-path="${esc(r.firma_incaricato_url)}" style="width:100%;border:1px solid var(--g200);border-radius:8px;background:#fff"><div style="font-size:11.5px;color:var(--g500);margin-top:4px">Incaricato · ${r.conf_incaricato_at?fmtDT(r.conf_incaricato_at):'—'} ${geoLink(r.firma_incaricato_lat,r.firma_incaricato_lng)}</div></div>`:'<div></div>'}
     </div>
 
     <div class="fg"><div class="fl">Raccolta ritirata</div><div>${r.chiusura_at?fmtDT(r.chiusura_at):'—'} ${geoLink(r.chiusura_lat,r.chiusura_lng)}</div></div>
 
     <div class="fl" style="margin-bottom:8px;margin-top:14px">Versamento</div>
     <div class="fg"><div>${r.versato_at?fmtDT(r.versato_at):'—'} ${geoLink(r.versato_lat,r.versato_lng)}</div></div>
-    ${r.ricevuta_url?`<div class="fg"><img src="${esc(r.ricevuta_url)}" class="thumb" style="width:100%;max-width:320px;height:auto" onclick="window.open('${esc(r.ricevuta_url)}','_blank')"></div>`:''}
+    ${r.ricevuta_url?`<div class="fg"><img data-sb-bucket="servizi-ricevute" data-sb-path="${esc(r.ricevuta_url)}" class="thumb" style="width:100%;max-width:320px;height:auto;cursor:pointer" onclick="openSignedImage('servizi-ricevute','${esc(r.ricevuta_url)}')"></div>`:''}
 
     <div class="fg"><div class="fl">Note</div><textarea class="fta" id="rac-note" placeholder="Nessuna nota">${esc(r.note||'')}</textarea></div>
   `;
@@ -535,6 +569,7 @@ function openRaccoltaDetail(id){
   const dataStr=dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
   const oraStr=dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
   openM(`${esc(sede?.nome||'')}: raccolta creata il ${dataStr} alle ${oraStr}`,body,btns,true);
+  hydrateSignedImages($('mbdy'));
 }
 
 // ══════════════════════════════════════════
