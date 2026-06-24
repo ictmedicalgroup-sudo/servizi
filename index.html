@@ -46,7 +46,7 @@ input,select,textarea{font-size:16px!important;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 /* TOAST */
-#toast{position:fixed;bottom:24px;right:16px;left:16px;z-index:9999;padding:14px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:opacity .25s;max-width:480px;margin:0 auto;display:flex;align-items:center;gap:10px;justify-content:space-between;}
+#toast{position:fixed;top:calc(12px + env(safe-area-inset-top));right:16px;left:16px;z-index:9999;padding:14px 18px;border-radius:var(--r);font-size:13px;font-weight:600;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:opacity .25s;max-width:480px;margin:0 auto;display:flex;align-items:center;gap:10px;justify-content:space-between;}
 #toast.show{pointer-events:auto;opacity:1;}
 #toast .toast-msg{flex:1;word-break:break-word;}
 #toast .toast-copy{flex-shrink:0;background:rgba(0,0,0,.12);border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;color:inherit;font-family:'Raleway',sans-serif;}
@@ -355,6 +355,35 @@ async function writeLog(azione,dettaglio){
 }
 
 // ══════════════════════════════════════════
+// GEOLOCALIZZAZIONE — consenso persistente per utente, toggle globale admin
+// ══════════════════════════════════════════
+S.geoEnabled=true; // letto da servizi_config al login
+async function loadGeoConfig(){
+  try{const rows=await db('GET',T('config'),{flt:'id=eq.true'});S.geoEnabled=rows?.[0]?.geo_enabled!==false;}
+  catch(e){S.geoEnabled=true;}
+}
+// Ritorna {lat,lng} oppure null. Non richiede mai il permesso se l'utente
+// l'ha già negato in precedenza; se non l'ha mai concesso/negato, lo chiede
+// (tramite il prompt nativo del browser) e salva l'esito su servizi_profili.
+function getGeo(){
+  return new Promise(resolve=>{
+    if(!S.geoEnabled||!navigator.geolocation){resolve(null);return;}
+    if(S.user.geo_consenso===false){resolve(null);return;}
+    navigator.geolocation.getCurrentPosition(
+      async pos=>{
+        if(S.user.geo_consenso!==true){S.user.geo_consenso=true;db('PATCH',T('profili'),{flt:`id=eq.${S.user.id}`,body:{geo_consenso:true}}).catch(()=>{});}
+        resolve({lat:+pos.coords.latitude.toFixed(7),lng:+pos.coords.longitude.toFixed(7)});
+      },
+      async err=>{
+        if(S.user.geo_consenso!==false){S.user.geo_consenso=false;db('PATCH',T('profili'),{flt:`id=eq.${S.user.id}`,body:{geo_consenso:false}}).catch(()=>{});}
+        resolve(null);
+      },
+      {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+    );
+  });
+}
+
+// ══════════════════════════════════════════
 // AUTH
 // ══════════════════════════════════════════
 async function doLogin(){
@@ -370,6 +399,7 @@ async function doLogin(){
     if(!rows?.length)throw new Error('Profilo non trovato. Contatta l\'amministratore.');
     if(rows[0].attivo===false)throw new Error('Utente disabilitato. Contatta l\'amministratore.');
     S.user=rows[0];
+    await loadGeoConfig();
     await loadAll();
     $('lp').classList.add('hid');$('app').classList.remove('hid');
     initTopbar();
@@ -514,12 +544,12 @@ function openRaccolta(id){
     referenteId:r.referente_id||'',
     firmaRef:r.firma_referente_url,firmaInc:r.firma_incaricato_url,
     confRef:r.conf_referente_at,confInc:r.conf_incaricato_at,
+    ricevutaUrl:r.ricevuta_url||null,
   };
   goView('flow');
-  if(r.stato==='chiusa'||r.stato==='annullata'){renderStepRiepilogo(true);}
-  else if(r.stato==='versata'){renderStepRiepilogo(true);}
-  else if(r.stato==='confermata'){renderStepVersamento();}
-  else if(r.firma_referente_url&&r.firma_incaricato_url){renderStepRiepilogo();}
+  if(r.stato==='confermata'){renderStepVersamento();}
+  else if(['versata','chiusa','annullata'].includes(r.stato)){renderStepVersamento(true);}
+  else if(r.confRef&&r.confInc){renderStepFirme();}
   else {renderStepImporto();}
 }
 
@@ -533,36 +563,39 @@ function stepsHTML(cur){
 function renderStepImporto(){
   const f=S.flow;const sede=sedeById(f.sedeId);
   const refs=referentiDiSede(f.sedeId);
+  const locked=!!(f.confRef||f.confInc); // almeno una firma già apposta → blocco modifiche
   $('v-flow').innerHTML=`
     <div class="ph"><button class="back" onclick="abortFlow()">‹</button><div><h1>${esc(sede?.nome||'Sede')}</h1><div class="sub">${sede?.indirizzo?esc(sede.indirizzo)+' · ':''}Nuova raccolta</div></div></div>
     ${stepsHTML('importo')}
 
-    <div class="importo-box" id="imp-box">
+    ${locked?`<div class="rec-card" style="background:var(--amber-light);border-color:#f0d98a;margin-bottom:14px"><div style="padding:10px 0;font-size:12.5px;color:#7a5400">🔒 Importo e referente non sono più modificabili: è già stata registrata almeno una firma.</div></div>`:''}
+
+    <div class="importo-box" id="imp-box" style="${locked?'opacity:.75':''}">
       <label>Totale condiviso al tavolo</label>
       <div class="importo-input">
         <span class="eur">€</span>
-        <input id="imp-val" inputmode="decimal" placeholder="0,00" value="${esc(f.importo)}"
+        <input id="imp-val" inputmode="decimal" placeholder="0,00" value="${esc(f.importo)}" ${locked?'readonly':''}
           oninput="onImportoInput(this)" onfocus="$('imp-box').classList.add('focus')" onblur="$('imp-box').classList.remove('focus')">
       </div>
     </div>
 
     <div class="fg">
       <label>Referente di sede</label>
-      <select id="imp-ref">
+      <select id="imp-ref" ${locked?'disabled':''} style="${locked?'opacity:.75':''}">
         <option value="">— Seleziona referente —</option>
         ${refs.map(p=>`<option value="${p.id}" ${p.id===f.referenteId?'selected':''}>${esc(fullName(p))}</option>`).join('')}
       </select>
       ${refs.length?'':'<div class="hint" style="color:var(--red)">Nessun referente associato a questa sede. Va aggiunto da un amministratore.</div>'}
     </div>
 
-    <div class="rec-card" style="background:var(--blue-xlight);border-color:var(--blue-light)">
+    ${locked?'':`<div class="rec-card" style="background:var(--blue-xlight);border-color:var(--blue-light)">
       <div style="padding:10px 0;font-size:12.5px;color:var(--navy);line-height:1.5">
         <strong>Promemoria:</strong> il denaro è stato contato due volte (referente + incaricato) prima di inserirlo qui. Non va riposto in buste prima dell'accordo sulla cifra.
       </div>
-    </div>
+    </div>`}
 
     <div class="bottom-bar">
-      <button class="btn btn-primary" id="imp-next" onclick="submitImporto()">Procedi alle firme</button>
+      <button class="btn btn-primary" id="imp-next" onclick="${locked?"renderStepFirme()":"submitImporto()"}">${locked?'Vai alle firme':'Procedi alle firme'}</button>
     </div>
   `;
 }
@@ -686,31 +719,28 @@ async function confirmFirma(who){
     const path=`${f.raccoltaId}/${who}_${Date.now()}.png`;
     const url=await uploadToStorage(BUCKET_FIRME,path,blob,'image/png');
     const now=new Date().toISOString();
+    const geo=await getGeo();
     const patch=who==='ref'
-      ?{firma_referente_url:url,conf_referente_at:now}
-      :{firma_incaricato_url:url,conf_incaricato_at:now};
-    // se è la seconda firma → stato confermata
-    const altroFirmato=who==='ref'?f.confInc:f.confRef;
-    if(altroFirmato)patch.stato='confermata';
+      ?{firma_referente_url:url,conf_referente_at:now,firma_referente_lat:geo?.lat??null,firma_referente_lng:geo?.lng??null}
+      :{firma_incaricato_url:url,conf_incaricato_at:now,firma_incaricato_lat:geo?.lat??null,firma_incaricato_lng:geo?.lng??null};
     await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:patch});
     if(who==='ref'){f.firmaRef=url;f.confRef=now;}else{f.firmaInc=url;f.confInc=now;}
     await writeLog('firma_apposta',`${who==='ref'?'Referente':'Incaricato'} · raccolta ${f.raccoltaId}`);
     await reloadRaccolte();
     toast('Firma registrata ✓','ok');
-    if(f.confRef&&f.confInc)renderStepRiepilogo();
-    else renderStepFirme();
+    renderStepFirme();
   }catch(e){toast(e.message,'terr');btn.innerHTML='Conferma';btn.disabled=false;}
 }
 
-// ── FASE 2.3 — riepilogo + termina operazione ─────────────────────────
+// ── FASE 2.3 — riepilogo + termina raccolta (NON ancora versamento) ────
 function renderStepRiepilogo(readonly){
   const f=S.flow;
   const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
   const sede=sedeById(f.sedeId),ref=profById(f.referenteId),inc=S.user;
-  const versata=['versata','chiusa'].includes(r.stato);
+  const giaChiusa=['confermata','versata','chiusa'].includes(r.stato);
   $('v-flow').innerHTML=`
     <div class="ph"><button class="back" onclick="${readonly?"goView('storico')":"renderStepFirme()"}">‹</button><div><h1>Riepilogo</h1><div class="sub">${esc(sede?.nome||'')}</div></div></div>
-    ${stepsHTML(versata?'versamento':'riepilogo')}
+    ${stepsHTML('riepilogo')}
 
     <div class="importo-display"><div class="lbl">Totale concordato</div><div class="val">${eur(r.importo_dichiarato)}</div></div>
 
@@ -721,8 +751,6 @@ function renderStepRiepilogo(readonly){
       <div class="rec-row"><span class="k">Firma referente</span><span class="v ok">${r.conf_referente_at?'✓ '+fmtDT(r.conf_referente_at):'—'}</span></div>
       <div class="rec-row"><span class="k">Firma incaricato</span><span class="v ok">${r.conf_incaricato_at?'✓ '+fmtDT(r.conf_incaricato_at):'—'}</span></div>
       <div class="rec-row"><span class="k">Stato</span><span class="v">${statoTag(r.stato)}</span></div>
-      ${r.importo_versato!=null?`<div class="rec-row"><span class="k">Versato</span><span class="v">${eur(r.importo_versato)}</span></div>`:''}
-      ${r.delta!=null&&Number(r.delta)!==0?`<div class="rec-row"><span class="k">Delta</span><span class="v warn">${eur(r.delta)}</span></div>`:''}
     </div>
 
     <div style="display:flex;gap:10px;margin-bottom:8px">
@@ -731,28 +759,55 @@ function renderStepRiepilogo(readonly){
     </div>
 
     <div class="bottom-bar">
-      ${versata
-        ? (r.stato==='versata'
-            ? `<button class="btn btn-primary" onclick="renderStepVersamento()">Completa versamento</button>`
-            : `<button class="btn btn-ghost" onclick="goView('home')">Torna alla home</button>`)
-        : `<button class="btn btn-primary" onclick="renderStepVersamento()">Termina e vai al versamento</button>`}
+      ${giaChiusa
+        ? `<button class="btn btn-ghost" onclick="goView('home')">Torna alla home</button>`
+        : `<button class="btn btn-primary" id="riep-termina" onclick="terminaRaccolta()">Termina</button>`}
     </div>
   `;
 }
+async function terminaRaccolta(){
+  const f=S.flow;
+  const btn=$('riep-termina');btn.innerHTML='<span class="spn"></span> Salvataggio…';btn.disabled=true;
+  try{
+    const geo=await getGeo();
+    await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{
+      stato:'confermata',chiusura_at:new Date().toISOString(),
+      chiusura_lat:geo?.lat??null,chiusura_lng:geo?.lng??null,
+    }});
+    await writeLog('raccolta_confermata',`Sede ${sedeById(f.sedeId)?.nome} · ${eur(parseImporto(f.importo))}`);
+    await reloadRaccolte();
+    toast('Raccolta confermata ✓ — il versamento si fa più tardi','ok');
+    S.flow=null;
+    goView('home');
+  }catch(e){toast(e.message,'terr');btn.innerHTML='Termina';btn.disabled=false;}
+}
 
 // ── FASE 3+4 — versamento + ricevuta + chiusura ───────────────────────
-function renderStepVersamento(){
+function renderStepVersamento(readonly){
   const f=S.flow;
   const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
   f.ricevutaUrl=f.ricevutaUrl||r.ricevuta_url||null;
+  const hasDelta=r.delta!=null&&Number(r.delta)!==0;
   $('v-flow').innerHTML=`
-    <div class="ph"><button class="back" onclick="renderStepRiepilogo()">‹</button><div><h1>Versamento</h1><div class="sub">Banca o cash-in sede centrale</div></div></div>
+    <div class="ph"><button class="back" onclick="goView('storico')">‹</button><div><h1>Versamento</h1><div class="sub">Banca o cash-in sede centrale</div></div></div>
     ${stepsHTML('versamento')}
+
+    <button class="btn btn-ghost" style="margin-bottom:14px" onclick="renderRiepilogoPrecedente()">👁 Vedi riepilogo e firme (sola lettura)</button>
 
     <div class="rec-card" style="background:var(--blue-xlight);border-color:var(--blue-light)">
       <div class="rec-row" style="border:none"><span class="k">Importo raccolto</span><span class="v">${eur(r.importo_dichiarato)}</span></div>
     </div>
 
+    ${readonly?`
+    <div class="rec-card">
+      <div class="rec-row"><span class="k">Importo versato</span><span class="v">${eur(r.importo_versato)}</span></div>
+      ${r.delta!=null?`<div class="rec-row"><span class="k">Delta</span><span class="v ${hasDelta?'warn':'ok'}">${eur(r.delta)}</span></div>`:''}
+      <div class="rec-row"><span class="k">Versato il</span><span class="v">${fmtDT(r.versato_at)}</span></div>
+      <div class="rec-row"><span class="k">Stato</span><span class="v">${statoTag(r.stato)}</span></div>
+    </div>
+    ${r.ricevuta_url?`<img src="${esc(r.ricevuta_url)}" class="ricevuta-preview">`:''}
+    <div class="bottom-bar"><button class="btn btn-ghost" onclick="goView('storico')">Torna allo storico</button></div>
+    `:`
     <div class="fg">
       <label>Importo effettivamente versato</label>
       <div class="importo-box" id="vers-box" style="margin-bottom:0">
@@ -774,6 +829,30 @@ function renderStepVersamento(){
     <div class="bottom-bar">
       <button class="btn btn-primary" id="vers-done" onclick="chiudiCiclo()">Termina operazione</button>
     </div>
+    `}
+  `;
+}
+// Mostra il riepilogo (importo+firme) in sola lettura, richiamabile dallo step versamento
+function renderRiepilogoPrecedente(){
+  const f=S.flow;
+  const r=S.raccolte.find(x=>x.id===f.raccoltaId)||{};
+  const sede=sedeById(f.sedeId),ref=profById(f.referenteId),inc=profById(r.incaricato_id);
+  $('v-flow').innerHTML=`
+    <div class="ph"><button class="back" onclick="renderStepVersamento(${['versata','chiusa','annullata'].includes(r.stato)})">‹</button><div><h1>Riepilogo raccolta</h1><div class="sub">${esc(sede?.nome||'')} · sola lettura</div></div></div>
+
+    <div class="importo-display"><div class="lbl">Totale concordato</div><div class="val">${eur(r.importo_dichiarato)}</div></div>
+
+    <div class="rec-card" style="margin-top:16px">
+      <div class="rec-row"><span class="k">Referente</span><span class="v">${esc(fullName(ref))}</span></div>
+      <div class="rec-row"><span class="k">Incaricato</span><span class="v">${esc(fullName(inc))}</span></div>
+      <div class="rec-row"><span class="k">Firma referente</span><span class="v ok">${r.conf_referente_at?'✓ '+fmtDT(r.conf_referente_at):'—'}</span></div>
+      <div class="rec-row"><span class="k">Firma incaricato</span><span class="v ok">${r.conf_incaricato_at?'✓ '+fmtDT(r.conf_incaricato_at):'—'}</span></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:8px">
+      ${r.firma_referente_url?`<img src="${esc(r.firma_referente_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+      ${r.firma_incaricato_url?`<img src="${esc(r.firma_incaricato_url)}" style="flex:1;height:90px;object-fit:contain;background:#fff;border:1px solid var(--g200);border-radius:8px">`:''}
+    </div>
+    <div class="bottom-bar"><button class="btn btn-ghost" onclick="renderStepVersamento(${['versata','chiusa','annullata'].includes(r.stato)})">‹ Torna al versamento</button></div>
   `;
 }
 function onImportoInput2(el){onImportoInput(el);}
@@ -802,8 +881,10 @@ async function chiudiCiclo(){
   const delta=+(versato-Number(r.importo_dichiarato)).toFixed(2);
   const btn=$('vers-done');btn.innerHTML='<span class="spn"></span> Chiusura…';btn.disabled=true;
   try{
+    const geo=await getGeo();
     await db('PATCH',T('raccolte'),{flt:`id=eq.${f.raccoltaId}`,body:{
       importo_versato:versato,delta,versato_at:new Date().toISOString(),stato:'chiusa',
+      versato_lat:geo?.lat??null,versato_lng:geo?.lng??null,
     }});
     await writeLog('raccolta_chiusa',`${eur(r.importo_dichiarato)} → versato ${eur(versato)} · delta ${eur(delta)}`);
     await reloadRaccolte();
