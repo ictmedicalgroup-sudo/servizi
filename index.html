@@ -915,7 +915,7 @@ function renderStorico(){
     <div class="ph"><button class="back" onclick="goView('home')">‹</button><div><h1>Le mie raccolte</h1><div class="sub">${S.raccolte.length} totali</div></div></div>
     <div class="search-wrap"><input id="stor-search" placeholder="Cerca per sede..." oninput="renderStoricoList()"></div>
     <div style="display:flex;gap:7px;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px">
-      ${['tutte','in_corso','ritirata','versata','annullata'].map(s=>`<button onclick="setStorFilter('${s}')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid ${_storFilter===s?'var(--verde)':'var(--g200)'};background:${_storFilter===s?'var(--blue-xlight)':'#fff'};color:${_storFilter===s?'var(--verde)':'var(--g500)'}">${{tutte:'Tutte',in_corso:'In corso',ritirata:'Ritirate',versata:'Versate',annullata:'Annullate'}[s]}</button>`).join('')}
+      ${['tutte','in_corso','ritirata','versata'].map(s=>`<button onclick="setStorFilter('${s}')" style="flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid ${_storFilter===s?'var(--verde)':'var(--g200)'};background:${_storFilter===s?'var(--blue-xlight)':'#fff'};color:${_storFilter===s?'var(--verde)':'var(--g500)'}">${{tutte:'Tutte',in_corso:'In corso',ritirata:'Ritirate',versata:'Versate'}[s]}</button>`).join('')}
     </div>
     <div id="stor-list"></div>
   `;
